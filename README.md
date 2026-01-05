@@ -5,8 +5,6 @@
 > **开始时间：** 2026.01.06
 >
 > **预计时长：** 6-7 个月
->
-> **教练：** Claude (Anthropic)
 
 ---
 
@@ -37,10 +35,6 @@
 - ✅ 能开发 AI Agent 执行自动化任务
 - ✅ 能把 AI 集成到现有 Java 后端项目
 - ✅ 拿着作品去面试，找到 AI 应用开发工作
-
-### 目标薪资
-- **初期：** 15-25K
-- **1年后：** 25-35K
 
 ---
 
@@ -101,8 +95,8 @@ _（待更新...）_
 ## 🛠️ 技术栈
 
 ### 当前掌握
-- **语言：** Python（学习中）, Java（3.5年经验）
-- **后端：** Spring Boot, MyBatis, MySQL
+- **语言：** Python（学习中）, Java
+- **后端：** Spring Boot, MyBatis, MySQL......
 
 ### 学习中
 - **AI/ML：** OpenAI API, Prompt Engineering
@@ -151,9 +145,7 @@ _（持续更新中...）_
 
 - **姓名：** 顾清歌
 - **年龄：** 29 岁
-- **学历：** 大专，非科班
-- **背景：** 3.5年 Java 后端开发（外包）
-- **动机：** 转行 AI + 兴趣驱动
+- **背景：** Java 后端开发
 - **时间：** 工作日 1-1.5h，周末 3-4h
 
 ---
@@ -179,7 +171,7 @@ _（持续更新中...）_
 
 ## 🔗 相关链接
 
-- [Claude AI](https://claude.ai) - 我的 AI 教练
+- [Claude AI](https://claude.ai) - Claude
 - [OpenAI](https://openai.com) - 大模型 API
 - [LangChain](https://www.langchain.com) - AI 应用框架
 
