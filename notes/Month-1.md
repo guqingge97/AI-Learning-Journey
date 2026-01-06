@@ -553,3 +553,449 @@ python
 
 ---
 
+## Day 3 - 生成器入门（2026-01-07）
+
+### 核心目标
+
+理解生成器的惰性计算本质，建立内存效率的工程意识
+
+------
+
+### Why（不学会导致的工程死穴）
+
+如果不理解生成器，你会：
+
+- ❌ 处理大文件时内存爆炸（10GB 文件占用 10GB+ 内存）
+- ❌ 程序崩溃或卡死（内存不足）
+- ❌ 无法处理超大数据集（如几亿条记录）
+- ❌ 写出低效的代码（占用大量不必要的内存）
+
+**工程上的真实代价：**
+
+- 服务器内存成本增加
+- 程序响应变慢
+- 无法处理大规模数据
+- 用户体验差（程序卡顿）
+
+**典型场景：**
+
+- 读取日志文件（几GB）
+- 处理数据库查询结果（百万条记录）
+- 批量处理文件
+- 实时数据流处理
+
+------
+
+### What（第一性原理 + 类比）
+
+**生成器的本质：惰性计算（Lazy Evaluation）**
+
+**列表 = 容器（盒子）**
+
+- 一次性创建所有元素
+- 全部存在内存里
+- 立即计算
+- 占用空间 = 所有元素的大小
+
+**生成器 = 配方（食谱）**
+
+- 不创建所有元素
+- 用一个生成一个
+- 按需计算
+- 占用空间 = 配方大小（几百字节）
+
+**类比：**
+
+> **列表 = 录制好的电影**
+>
+> - 所有画面都已拍好
+> - 存在硬盘里（占空间）
+> - 可以暂停、快进、回放
+>
+> **生成器 = 电视直播**
+>
+> - 画面实时生成
+> - 播完就没了
+> - 只能往前看，不能回放
+> - 不占存储空间
+
+------
+
+### How（最小可运行范式）
+
+#### **生成器的两种语法（独立，不混用）**
+
+------
+
+**方式1：生成器表达式（Generator Expression）**
+
+
+
+python
+
+```python
+# 语法：圆括号 + 类似列表推导式
+gen = (x ** 2 for x in range(10))
+
+# 对比列表推导式
+lst = [x ** 2 for x in range(10)]  # 列表（方括号）
+gen = (x ** 2 for x in range(10))  # 生成器（圆括号）
+```
+
+**适用场景：简单的一行表达式**
+
+
+
+python
+
+```python
+# ✅ 简单转换
+squares = (x ** 2 for x in numbers)
+
+# ✅ 简单过滤
+evens = (x for x in numbers if x % 2 == 0)
+
+# ✅ 配合聚合函数
+total = sum(x ** 2 for x in range(1000000))
+max_value = max(x for x in huge_list if x > 0)
+```
+
+------
+
+**方式2：生成器函数（Generator Function）**
+
+
+
+python
+
+```python
+# 语法：def 函数 + yield 关键字
+def my_generator(n):
+    for i in range(n):
+        yield i ** 2
+
+gen = my_generator(10)
+```
+
+**适用场景：复杂逻辑**
+
+
+
+python
+
+```python
+# ✅ 读取文件
+def read_errors(filename):
+    with open(filename, 'r') as f:
+        for line in f:
+            if 'ERROR' in line:
+                yield line.strip()
+
+# ✅ 复杂算法（斐波那契）
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        yield a
+        a, b = b, a + b
+
+# ✅ 无限序列
+def counter(start=0, step=1):
+    current = start
+    while True:
+        yield current
+        current += step
+```
+
+------
+
+#### **yield 的工作机制**
+
+**yield = "暂停按钮"**
+
+
+
+python
+
+```python
+def count_up_to(n):
+    i = 0
+    while i < n:
+        print(f"生成 {i}")
+        yield i  # ← 暂停，返回 i 给外面
+        print(f"继续...")
+        i += 1
+
+gen = count_up_to(3)
+print(next(gen))  # 生成 0 → 暂停 → 返回 0
+print("外面做其他事")
+print(next(gen))  # 继续... → 生成 1 → 暂停 → 返回 1
+```
+
+------
+
+#### **内存对比（实际测试）**
+
+
+
+python
+
+```python
+import sys
+
+# 列表：存储所有元素
+numbers_list = [i for i in range(10000000)]
+print(sys.getsizeof(numbers_list))  # 约 800MB
+
+# 生成器：只存配方
+numbers_gen = (i for i in range(10000000))
+print(sys.getsizeof(numbers_gen))  # 约 120 字节
+
+# 相差约 666 万倍！
+```
+
+------
+
+#### **使用生成器**
+
+
+
+python
+
+```python
+# 方式1：for 循环（最常用）
+for item in (x ** 2 for x in range(10)):
+    print(item)
+
+# 方式2：next() 函数（手动获取）
+gen = (x for x in range(3))
+print(next(gen))  # 0
+print(next(gen))  # 1
+print(next(gen))  # 2
+# print(next(gen))  # StopIteration 异常
+
+# 方式3：转换为列表（失去内存优势）
+gen = (x for x in range(10))
+lst = list(gen)  # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+```
+
+------
+
+### Pitfall（真实踩坑）
+
+**坑1：生成器只能遍历一次**
+
+
+
+python
+
+```python
+gen = (x for x in range(5))
+print(list(gen))  # [0, 1, 2, 3, 4]
+print(list(gen))  # [] ← 空了！
+
+# 解决：如果需要多次使用，用列表
+lst = [x for x in range(5)]
+print(list(lst))  # [0, 1, 2, 3, 4]
+print(list(lst))  # [0, 1, 2, 3, 4] ← 还在
+```
+
+**坑2：生成器不支持索引和切片**
+
+
+
+python
+
+```python
+gen = (x for x in range(10))
+# print(gen[5])  # ❌ TypeError
+# print(len(gen))  # ❌ TypeError
+
+# 解决：转换为列表
+lst = list(gen)
+print(lst[5])  # 5
+print(len(lst))  # 10
+```
+
+**坑3：混淆两种生成器语法**
+
+
+
+python
+
+```python
+# ❌ 错误：以为要混合使用
+# (yield x for x in range(10))  # 语法错误
+
+# ✅ 正确：两种语法独立
+# 方式1：表达式
+gen1 = (x for x in range(10))
+
+# 方式2：函数
+def gen2():
+    for x in range(10):
+        yield x
+```
+
+**坑4：过度使用生成器**
+
+
+
+python
+
+```python
+# ❌ 数据很小，没必要用生成器
+small_data = (x for x in range(10))  # 反而更复杂
+
+# ✅ 小数据直接用列表
+small_data = [x for x in range(10)]
+```
+
+------
+
+### Application（在哪里用）
+
+**实际应用场景：**
+
+**1. 处理大文件**
+
+
+
+python
+
+```python
+def read_large_log(filename):
+    with open(filename, 'r') as f:
+        for line in f:
+            if 'ERROR' in line:
+                yield line.strip()
+
+# 使用：内存始终只占几KB
+for error in read_large_log('huge.log'):
+    process(error)
+```
+
+**2. 数据库查询结果**
+
+
+
+python
+
+```python
+def query_users(limit=None):
+    results = db.query("SELECT * FROM users")
+    for row in results:
+        yield process_row(row)
+        if limit and count >= limit:
+            break
+```
+
+**3. 数据流处理（管道）**
+
+
+
+python
+
+```python
+# 链式处理，内存效率高
+numbers = range(1000000)
+squares = (x ** 2 for x in numbers)
+evens = (x for x in squares if x % 2 == 0)
+result = sum(evens)  # 只占几百字节内存
+```
+
+**4. 生成无限序列**
+
+
+
+python
+
+~~~python
+def fibonacci():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+# 取前10个
+from itertools import islice
+first_10 = list(islice(fibonacci(), 10))
+```
+
+**在后续学习中的位置：**
+- Month 2（大模型应用）：流式输出 API 响应
+- Month 3（RAG系统）：批量处理大量文档
+- Month 4（Agent开发）：处理长时间运行的任务
+- 所有涉及大数据处理的场景
+
+---
+
+### 视觉闭环
+```
+列表 vs 生成器内存对比：
+
+列表（立即计算）：
+┌──────────────────────────────────┐
+│ [1, 4, 9, 16, 25, ..., 10000^2] │ ← 全部存储
+└──────────────────────────────────┘
+   内存：约 800MB
+
+生成器（惰性计算）：
+┌────────────────┐
+│ Recipe:        │
+│ for i in range │ ← 只存配方
+│   yield i**2   │
+└────────────────┘
+   内存：约 120 字节
+
+使用时：
+生成 1 → 使用 → 释放
+生成 4 → 使用 → 释放
+生成 9 → 使用 → 释放
+...（依次进行）
+
+---
+
+判断使用哪种生成器语法：
+
+需要生成数据？
+    ↓
+能用一行表达式写出来？
+  ↙              ↘
+YES              NO
+ ↓                ↓
+生成器表达式    生成器函数
+(x for x in)    def + yield
+~~~
+
+------
+
+### 工程师记忆分层
+
+**🗑️ 垃圾区（查文档就行）：**
+
+- `next()` 函数的具体用法
+- `itertools` 模块的各种函数
+- 生成器的内部实现细节
+
+**🔍 索引区（记关键词）：**
+
+- 遇到"大文件处理" → 想到生成器
+- 遇到"内存不够" → 想到生成器
+- 遇到"只需遍历一次" → 可以用生成器
+- 看到 `(...)` → 生成器表达式
+- 看到 `yield` → 生成器函数
+- 简单逻辑 → 生成器表达式
+- 复杂逻辑 → 生成器函数
+
+**💎 核心区（必须内化）：**
+
+- 生成器 = 配方/食谱，不是容器
+- 惰性计算：用一个生成一个，用完释放
+- 内存优势：可以相差百万倍
+- 两种语法独立：表达式 vs 函数（不混用）
+- yield = 暂停按钮，返回值给外面
+- 何时用：大数据、单次遍历、管道处理
+- 何时不用：需要多次访问、随机访问、小数据
+
+---
+
