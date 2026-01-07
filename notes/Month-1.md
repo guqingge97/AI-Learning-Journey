@@ -999,3 +999,596 @@ YES              NO
 
 ---
 
+## Day 4 - 装饰器基础（2026-01-08）
+
+### 核心目标
+
+理解装饰器的本质，掌握函数式编程的核心思维
+
+------
+
+### Why（不学会导致的工程死穴）
+
+如果不理解装饰器，你会：
+
+- ❌ 写大量重复代码（每个函数都要复制粘贴计时、日志逻辑）
+- ❌ 无法理解 Python 框架的核心机制（Flask 的 @app.route、Django 的 @login_required）
+- ❌ 无法阅读他人的 Python 代码（装饰器在 Python 中极其常见）
+- ❌ 错过 Python 最优雅的特性之一
+
+**工程上的真实代价：**
+
+- 代码维护成本高（修改一个地方要改 100 处）
+- 代码可读性差（业务逻辑和基础设施代码混在一起）
+- 无法使用主流框架的高级特性
+
+**类比 Java：**
+
+- 装饰器 ≈ Spring AOP（面向切面编程）
+- 装饰器 ≈ 动态代理
+- 但 Python 的装饰器更简洁、更优雅
+
+------
+
+### What（第一性原理 + 类比）
+
+**装饰器的本质：**
+
+> 装饰器 = 接收函数 + 返回新函数的函数
+
+**三个前置概念：**
+
+**1. 函数是第一类对象（First-Class Object）**
+
+- 函数可以赋值给变量
+- 函数可以作为参数传递
+- 函数可以作为返回值
+
+
+
+python
+
+```python
+def greet():
+    print("Hello")
+
+my_func = greet  # 函数赋值给变量
+my_func()        # 调用变量
+```
+
+------
+
+**2. 函数可以作为参数**
+
+
+
+python
+
+```python
+def execute(func):
+    print("准备执行...")
+    func()
+    print("执行完成")
+
+execute(greet)  # 把函数作为参数传入
+```
+
+------
+
+**3. 闭包（Closure）**
+
+- 内层函数"记住"了外层函数的变量
+- 即使外层函数执行完，变量还活着
+- 每次调用外层函数，创建新的闭包
+
+
+
+python
+
+```python
+def make_counter():
+    count = 0  # ← 这个变量被"捕获"到闭包
+    
+    def increment():
+        nonlocal count  # ← 修改外层变量
+        count += 1
+        return count
+    
+    return increment
+
+counter1 = make_counter()  # 创建闭包1
+counter2 = make_counter()  # 创建闭包2
+
+print(counter1())  # 1 ← counter1 的 count
+print(counter1())  # 2
+print(counter2())  # 1 ← counter2 的 count（独立）
+```
+
+**关键点：**
+
+- 不是"拷贝"，而是"绑定"
+- 每个闭包都有自己独立的变量
+
+------
+
+**装饰器的结构：**
+
+
+
+python
+
+```python
+def decorator(func):      # ← 接收原函数
+    def wrapper(*args, **kwargs):  # ← 包装函数（闭包）
+        # 执行前的操作
+        result = func(*args, **kwargs)  # ← 调用原函数
+        # 执行后的操作
+        return result      # ← 返回原函数的结果
+    return wrapper         # ← 返回包装函数
+```
+
+**类比理解：**
+
+> **Java 动态代理：**
+>
+> 
+>
+> java
+>
+> ```java
+> InvocationHandler handler = (proxy, method, args) -> {
+>     System.out.println("方法执行前");
+>     Object result = method.invoke(target, args);
+>     System.out.println("方法执行后");
+>     return result;
+> };
+> ```
+>
+> **Python 装饰器：**
+>
+> 
+>
+> python
+>
+> ```python
+> def my_decorator(func):
+>     def wrapper(*args, **kwargs):
+>         print("方法执行前")
+>         result = func(*args, **kwargs)
+>         print("方法执行后")
+>         return result
+>     return wrapper
+> ```
+
+------
+
+### How（最小可运行范式）
+
+#### **基础装饰器**
+
+
+
+python
+
+~~~python
+def my_decorator(func):
+    def wrapper():
+        print("执行前")
+        func()
+        print("执行后")
+    return wrapper
+
+# 方式1：手动装饰
+def say_hello():
+    print("Hello")
+
+say_hello = my_decorator(say_hello)
+say_hello()
+
+# 方式2：@ 语法糖（推荐）
+@my_decorator
+def say_hello():
+    print("Hello")
+
+say_hello()  # 自动被装饰
+```
+
+**输出：**
+```
+执行前
+Hello
+执行后
+~~~
+
+------
+
+#### **处理参数的装饰器**
+
+
+
+python
+
+```python
+def timer(func):
+    def wrapper(*args, **kwargs):  # ← 接收任意参数
+        import time
+        start = time.time()
+        result = func(*args, **kwargs)  # ← 传递给原函数
+        end = time.time()
+        print(f"[{func.__name__}] 耗时: {end - start:.4f}秒")
+        return result  # ← 返回原函数的结果
+    return wrapper
+
+@timer
+def add(a, b):
+    return a + b
+
+@timer
+def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+print(add(3, 5))           # 8，并记录时间
+print(greet("Alice"))      # Hello, Alice!，并记录时间
+```
+
+------
+
+#### **实用装饰器示例**
+
+**1. 计时器装饰器**
+
+
+
+python
+
+```python
+import time
+
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"[{func.__name__}] 耗时: {end - start:.4f}秒")
+        return result
+    return wrapper
+
+@timer
+def process_data():
+    time.sleep(1)
+    return "完成"
+```
+
+------
+
+**2. 日志装饰器**
+
+
+
+python
+
+~~~python
+def logger(func):
+    def wrapper(*args, **kwargs):
+        print(f"调用函数: {func.__name__}")
+        print(f"参数: {args}")
+        if kwargs:
+            print(f"关键字参数: {kwargs}")
+        
+        result = func(*args, **kwargs)
+        
+        print(f"返回值: {result}")
+        return result
+    return wrapper
+
+@logger
+def add(a, b):
+    return a + b
+
+add(3, 5)
+```
+
+**输出：**
+```
+调用函数: add
+参数: (3, 5)
+返回值: 8
+~~~
+
+------
+
+**3. 修改返回值的装饰器**
+
+
+
+python
+
+```python
+def double_result(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result * 2
+    return wrapper
+
+@double_result
+def add(a, b):
+    return a + b
+
+print(add(3, 5))  # 16 (不是8)
+```
+
+------
+
+### Pitfall（真实踩坑）
+
+**坑1：忘记 return result**
+
+
+
+python
+
+```python
+# ❌ 错误
+def my_decorator(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(f"结果: {result}")
+        # 忘记 return result
+
+@my_decorator
+def add(a, b):
+    return a + b
+
+x = add(3, 5)
+print(x)  # None ← 丢失了返回值！
+```
+
+**教训：**
+
+- 装饰器的 wrapper 必须 `return result`
+- 否则原函数的返回值会丢失
+
+------
+
+**坑2：忘记 *args 和 **kwargs**
+
+
+
+python
+
+```python
+# ❌ 错误
+def timer(func):
+    def wrapper():  # ← 不接收参数
+        func()      # ← 不传递参数
+    return wrapper
+
+@timer
+def add(a, b):
+    return a + b
+
+add(3, 5)  # ❌ TypeError: wrapper() takes 0 positional arguments
+```
+
+**教训：**
+
+- 通用装饰器必须用 `*args, **kwargs`
+- 才能处理任意参数的函数
+
+------
+
+**坑3：在装饰器里写具体函数名**
+
+
+
+python
+
+```python
+# ❌ 错误
+def logger(func):
+    def wrapper(*args, **kwargs):
+        result = test(*args, **kwargs)  # ← 写死了函数名
+        return result
+
+# test 在装饰器里不存在！
+```
+
+**教训：**
+
+- 装饰器内部要用 `func`，不是具体函数名
+- `func` 是传入的参数
+
+------
+
+**坑4：nonlocal 的误用**
+
+
+
+python
+
+```python
+def make_counter():
+    count = 0
+    
+    def increment():
+        count += 1  # ❌ UnboundLocalError
+        return count
+    
+    return increment
+```
+
+**正确写法：**
+
+
+
+python
+
+```python
+def make_counter():
+    count = 0
+    
+    def increment():
+        nonlocal count  # ✅ 告诉 Python 修改外层变量
+        count += 1
+        return count
+    
+    return increment
+```
+
+------
+
+### Application（在哪里用）
+
+**实际应用场景：**
+
+**1. 性能监控**
+
+
+
+python
+
+```python
+@timer
+def expensive_operation():
+    # 复杂计算
+    pass
+```
+
+**2. 日志记录**
+
+
+
+python
+
+```python
+@logger
+def api_call():
+    # API 请求
+    pass
+```
+
+**3. 权限验证（Web框架）**
+
+
+
+python
+
+```python
+@login_required  # Flask/Django
+def admin_page():
+    pass
+```
+
+**4. 缓存结果**
+
+
+
+python
+
+```python
+@cache
+def get_data():
+    # 查询数据库
+    pass
+```
+
+**5. 重试机制**
+
+
+
+python
+
+~~~python
+@retry(times=3)
+def unstable_api():
+    # 可能失败的操作
+    pass
+```
+
+**在后续学习中的位置：**
+- Month 2（大模型应用）：API 调用的重试装饰器
+- Month 3（RAG系统）：缓存装饰器优化检索
+- Month 5（Agent开发）：工具函数的日志装饰器
+- Month 6（生产部署）：性能监控装饰器
+
+---
+
+### 视觉闭环
+```
+装饰器的工作流程：
+
+原函数：
+def add(a, b):
+    return a + b
+
+↓ 应用装饰器 @timer
+
+等价于：
+add = timer(add)
+
+↓ timer 返回 wrapper
+
+实际调用：
+add(3, 5)
+    ↓
+wrapper(3, 5)
+    ↓
+    记录开始时间
+    ↓
+    调用原 add(3, 5) → 8
+    ↓
+    记录结束时间
+    ↓
+    打印耗时
+    ↓
+    返回 8
+
+---
+
+闭包的内存模型：
+
+counter1 = make_counter()
+counter2 = make_counter()
+
+内存中：
+┌─────────────────┐
+│ counter1 闭包   │
+│ count = 0 → 1   │ ← 独立的 count
+└─────────────────┘
+
+┌─────────────────┐
+│ counter2 闭包   │
+│ count = 0       │ ← 另一个独立的 count
+└─────────────────┘
+~~~
+
+------
+
+### 工程师记忆分层
+
+**🗑️ 垃圾区（查文档就行）：**
+
+- `func.__name__` 等函数属性
+- `functools.wraps` 装饰器（进阶）
+- 复杂的装饰器变体
+
+**🔍 索引区（记关键词）：**
+
+- 遇到"重复代码" → 想到装饰器
+- 遇到"横切关注点"（日志、计时、缓存） → 想到装饰器
+- 看到 `@xxx` → 知道是装饰器
+- 想不起语法 → 查"通用装饰器模板"
+- Python 框架的 `@` 语法 → 都是装饰器
+
+**💎 核心区（必须内化）：**
+
+- 装饰器本质：接收函数 + 返回新函数
+- `@decorator` = `func = decorator(func)`
+- 通用装饰器模板必须有：`*args, **kwargs, return result`
+- 闭包：内层函数记住外层变量（绑定，不是拷贝）
+- `nonlocal` 用于修改外层变量
+- 装饰器解决的核心问题：消除重复代码
+- 函数是第一类对象（可以传递、返回）
+
+---
+
