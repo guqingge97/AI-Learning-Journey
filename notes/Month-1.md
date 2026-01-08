@@ -1592,3 +1592,811 @@ counter2 = make_counter()
 
 ---
 
+## Day 5 - 装饰器进阶（2026-01-09）
+
+### 核心目标
+
+掌握带参数的装饰器、装饰器叠加和 functools.wraps
+
+------
+
+### Why（不学会导致的工程死穴）
+
+如果不掌握装饰器进阶，你会：
+
+- ❌ 无法写出灵活可配置的装饰器（如 `@retry(times=3)`）
+- ❌ 装饰器叠加时逻辑混乱（不知道执行顺序）
+- ❌ 装饰后函数元数据丢失（调试困难、文档消失）
+- ❌ 无法理解主流框架的装饰器用法（Flask、Django）
+
+**工程上的真实代价：**
+
+- 重试、权限、日志等通用功能难以复用
+- 装饰器组合时出现 bug
+- IDE 无法正确提示被装饰函数的信息
+- 代码可维护性差
+
+**实际场景：**
+
+
+
+python
+
+```python
+# Flask 路由（带参数的装饰器）
+@app.route('/user/<id>', methods=['GET', 'POST'])
+def user_profile(id):
+    pass
+
+# Django 权限检查（装饰器叠加）
+@login_required
+@permission_required('admin')
+def admin_panel(request):
+    pass
+```
+
+------
+
+### What（第一性原理 + 类比）
+
+#### **带参数的装饰器**
+
+**本质：装饰器工厂**
+
+> 带参数的装饰器实际上是一个返回装饰器的函数
+
+**结构对比：**
+
+**Day 4（两层）：**
+
+
+
+python
+
+```python
+def decorator(func):           # 接收函数
+    def wrapper(*args, **kwargs):  # 包装
+        return func(*args, **kwargs)
+    return wrapper
+```
+
+**Day 5（三层）：**
+
+
+
+python
+
+```python
+def decorator(参数):            # 第1层：接收装饰器参数
+    def inner_decorator(func):  # 第2层：接收函数
+        def wrapper(*args, **kwargs):  # 第3层：包装
+            # 使用参数
+            return func(*args, **kwargs)
+        return wrapper
+    return inner_decorator
+```
+
+**关键：**
+
+
+
+python
+
+```python
+@repeat(times=3)
+def my_func():
+    pass
+
+# 等价于：
+my_func = repeat(times=3)(my_func)
+#         ↑第1步返回装饰器  ↑第2步应用装饰器
+```
+
+------
+
+#### **装饰器叠加**
+
+**执行顺序：**
+
+- **应用顺序（定义时）：从下往上**（靠近函数的先应用）
+- **执行顺序（调用时）：从上往下**（最外层先执行）
+
+
+
+python
+
+```python
+@A    ← 第2个应用，第1个执行（最外层）
+@B    ← 第1个应用，第2个执行
+def func():
+    pass  ← 最后执行（最内层）
+```
+
+**等价于：**
+
+
+
+python
+
+```python
+func = A(B(func))
+```
+
+------
+
+#### **functools.wraps**
+
+**问题：** 装饰后函数元数据丢失
+
+
+
+python
+
+```python
+def timer(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+@timer
+def add(a, b):
+    """相加两个数"""
+    return a + b
+
+print(add.__name__)  # wrapper ← 丢失了函数名
+print(add.__doc__)   # None    ← 丢失了文档
+```
+
+**解决：**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def timer(func):
+    @wraps(func)  # ← 保留原函数元数据
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+@timer
+def add(a, b):
+    """相加两个数"""
+    return a + b
+
+print(add.__name__)  # add ✅
+print(add.__doc__)   # 相加两个数 ✅
+```
+
+------
+
+### How（最小可运行范式）
+
+#### **1. 带参数的装饰器（三层结构）**
+
+**基础模板：**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def my_decorator(参数):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 使用参数
+            result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+@my_decorator(参数值)
+def my_function():
+    pass
+```
+
+------
+
+**实例1：重复执行**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+@repeat(times=3)
+def say_hello():
+    print("Hello")
+
+say_hello()
+# 输出：
+# Hello
+# Hello
+# Hello
+```
+
+------
+
+**实例2：重试机制**
+
+
+
+python
+
+```python
+from functools import wraps
+import time
+
+def retry(times=3, delay=1):
+    """失败后自动重试的装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for i in range(times):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if i == times - 1:  # 最后一次尝试
+                        raise e
+                    time.sleep(delay)  # 等待后重试
+        return wrapper
+    return decorator
+
+@retry(times=3, delay=2)
+def unstable_api():
+    # 可能失败的 API 调用
+    import random
+    if random.random() < 0.7:
+        raise Exception("API 失败")
+    return "成功"
+```
+
+------
+
+**实例3：日志级别**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def log(level="INFO"):
+    """带日志级别的装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            print(f"[{level}] 调用 {func.__name__}")
+            result = func(*args, **kwargs)
+            print(f"[{level}] 返回: {result}")
+            return result
+        return wrapper
+    return decorator
+
+@log(level="DEBUG")
+def calculate(a, b):
+    return a + b
+
+@log(level="ERROR")
+def risky_operation():
+    pass
+```
+
+------
+
+#### **2. 装饰器叠加**
+
+**示例：**
+
+
+
+python
+
+~~~python
+def add_brackets(func):
+    @wraps(func)
+    def wrapper():
+        print("[")
+        func()
+        print("]")
+    return wrapper
+
+def add_quotes(func):
+    @wraps(func)
+    def wrapper():
+        print('"')
+        func()
+        print('"')
+    return wrapper
+
+@add_brackets
+@add_quotes
+def say_hello():
+    print("Hello")
+
+say_hello()
+```
+
+**输出：**
+```
+[
+"
+Hello
+"
+]
+```
+
+**执行流程：**
+```
+应用阶段（定义时）：
+say_hello = add_brackets(add_quotes(say_hello))
+           ↑后应用            ↑先应用
+
+调用阶段（执行时）：
+add_brackets wrapper
+  → 打印 [
+  → 调用 add_quotes wrapper
+      → 打印 "
+      → 调用 say_hello
+          → 打印 Hello
+      ← 返回
+      → 打印 "
+  ← 返回
+  → 打印 ]
+~~~
+
+------
+
+**实际应用（权限检查）：**
+
+
+
+python
+
+```python
+@login_required       # 第3个应用，第1个执行
+@role_check("admin")  # 第2个应用，第2个执行
+@log                  # 第1个应用，第3个执行
+def delete_user(user_id):
+    # 删除用户
+    pass
+
+# 执行顺序：
+# 1. 检查是否登录
+# 2. 检查是否有 admin 权限
+# 3. 记录日志
+# 4. 执行删除操作
+```
+
+------
+
+#### **3. functools.wraps 的使用**
+
+**标准装饰器模板（无参数）：**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def my_decorator(func):
+    @wraps(func)  # ← 必须加
+    def wrapper(*args, **kwargs):
+        # 执行前
+        result = func(*args, **kwargs)
+        # 执行后
+        return result
+    return wrapper
+```
+
+**标准装饰器模板（带参数）：**
+
+
+
+python
+
+```python
+from functools import wraps
+
+def my_decorator(参数):
+    def decorator(func):
+        @wraps(func)  # ← 在第二层加
+        def wrapper(*args, **kwargs):
+            # 使用参数
+            result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+```
+
+**wraps 保留的信息：**
+
+- `__name__`（函数名）
+- `__doc__`（文档字符串）
+- `__module__`（模块名）
+- `__annotations__`（类型注解）
+- `__qualname__`（限定名）
+
+------
+
+### Pitfall（真实踩坑）
+
+**坑1：for 循环写错**
+
+
+
+python
+
+```python
+# ❌ 错误
+def repeat(times):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for time in times:  # times 是数字，不能直接遍历
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+# ✅ 正确
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):  # 用 range(times)
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+```
+
+------
+
+**坑2：return 位置错误**
+
+
+
+python
+
+```python
+# ❌ 错误：return 在循环内
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):
+                result = func(*args, **kwargs)
+                return result  # 第一次循环就返回了
+        return wrapper
+    return decorator
+
+# ✅ 正确：return 在循环外
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):
+                result = func(*args, **kwargs)
+            return result  # 循环结束后再返回
+        return wrapper
+    return decorator
+```
+
+------
+
+**坑3：忘记三层 return**
+
+
+
+python
+
+```python
+# ❌ 错误：缺少最外层的 return
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    # 缺少 return decorator
+
+# ✅ 正确：三层都要 return
+def repeat(times):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(times):
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator  # 必须返回 decorator
+```
+
+------
+
+**坑4：忘记 @wraps(func)**
+
+
+
+python
+
+```python
+# ❌ 不好：元数据丢失
+def timer(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result
+    return wrapper
+
+@timer
+def add(a, b):
+    """相加两个数"""
+    return a + b
+
+print(add.__name__)  # wrapper ← 错误
+print(add.__doc__)   # None    ← 丢失
+
+# ✅ 正确：加上 @wraps(func)
+from functools import wraps
+
+def timer(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result
+    return wrapper
+```
+
+------
+
+**坑5：装饰器叠加顺序混乱**
+
+
+
+python
+
+```python
+# 容易混淆执行顺序
+@A
+@B
+@C
+def func():
+    pass
+
+# 记住：应用从下往上，执行从上往下
+# 等价于：func = A(B(C(func)))
+# 执行时：A wrapper → B wrapper → C wrapper → func
+```
+
+------
+
+### Application（在哪里用）
+
+**实际应用场景：**
+
+**1. API 重试机制**
+
+
+
+python
+
+```python
+@retry(times=3, delay=2)
+def call_external_api():
+    # 调用可能失败的外部 API
+    pass
+```
+
+**2. 权限检查**
+
+
+
+python
+
+```python
+@login_required
+@require_role("admin")
+def admin_panel():
+    pass
+```
+
+**3. 性能监控**
+
+
+
+python
+
+```python
+@timer
+@log(level="INFO")
+def expensive_operation():
+    pass
+```
+
+**4. 缓存**
+
+
+
+python
+
+```python
+@cache(expire=3600)
+def get_user_data(user_id):
+    # 查询数据库
+    pass
+```
+
+**5. 限流**
+
+
+
+python
+
+~~~python
+@rate_limit(calls=100, period=60)
+def api_endpoint():
+    pass
+```
+
+**在后续学习中的位置：**
+- Month 2（大模型应用）：API 调用的重试和日志装饰器
+- Month 3（RAG系统）：缓存装饰器优化检索性能
+- Month 5（Agent开发）：工具函数的权限和日志装饰器
+- Month 6（生产部署）：性能监控和限流装饰器
+
+---
+
+### 视觉闭环
+```
+带参数装饰器的三层结构：
+
+@repeat(times=3)
+def my_func():
+    pass
+
+↓ 展开
+
+my_func = repeat(times=3)(my_func)
+          ↑第1步          ↑第2步
+
+↓ 第1步：repeat(times=3)
+
+def decorator(func):      ← 返回这个装饰器
+    def wrapper(...):
+        for _ in range(3):  ← 使用参数 times
+            func(...)
+    return wrapper
+
+↓ 第2步：decorator(my_func)
+
+my_func = wrapper  ← 最终结果
+
+---
+
+装饰器叠加执行顺序：
+
+定义时（从下往上应用）：
+@A
+@B     ← 先应用
+@C     ← 最先应用
+def func():
+    pass
+
+等价于：func = A(B(C(func)))
+
+调用时（从上往下执行）：
+func()
+ ↓
+A.wrapper
+ ↓
+B.wrapper
+ ↓
+C.wrapper
+ ↓
+原 func
+
+---
+
+functools.wraps 的作用：
+
+装饰前：
+def add(a, b):
+    """相加两个数"""
+    return a + b
+
+add.__name__ = "add"
+add.__doc__ = "相加两个数"
+
+↓ 装饰（没有 @wraps）
+
+def timer(func):
+    def wrapper(...):
+        return func(...)
+    return wrapper
+
+add = timer(add)
+
+add.__name__ = "wrapper" ← 丢失
+add.__doc__ = None       ← 丢失
+
+↓ 装饰（有 @wraps）
+
+def timer(func):
+    @wraps(func)  ← 复制元数据
+    def wrapper(...):
+        return func(...)
+    return wrapper
+
+add = timer(add)
+
+add.__name__ = "add"     ← 保留
+add.__doc__ = "相加两个数" ← 保留
+~~~
+
+------
+
+### 工程师记忆分层
+
+**🗑️ 垃圾区（查文档就行）：**
+
+- `functools.wraps` 保留的所有元数据列表
+- 更复杂的装饰器变体（类装饰器、装饰器类）
+- 装饰器的内部实现细节
+
+**🔍 索引区（记关键词）：**
+
+- 遇到"需要配置的装饰器" → 想到三层结构
+- 遇到"多个装饰器" → 记住"应用从下往上，执行从上往下"
+- 写装饰器 → 记得加 `@wraps(func)`
+- 看到 `@decorator()` 有括号 → 知道是带参数的装饰器
+- 看到 `raise` → 知道是抛出异常
+
+**💎 核心区（必须内化）：**
+
+- 带参数装饰器 = 三层函数 + 三个 return
+- 装饰器叠加：应用从下往上，执行从上往下
+- `@A @B def func()` = `func = A(B(func))`
+- 必须在 wrapper 上加 `@wraps(func)` 保留元数据
+- `for _ in range(times)` 不是 `for time in times`
+- return 在循环外面，不是循环里面
+- 三层结构模板必须记住：
+
+
+
+python
+
+```python
+  def decorator(参数):
+      def inner_decorator(func):
+          @wraps(func)
+          def wrapper(*args, **kwargs):
+              # 使用参数
+              return func(*args, **kwargs)
+          return wrapper
+      return inner_decorator
+```
+
+------
