@@ -2400,3 +2400,895 @@ python
 ```
 
 ------
+
+## Day 6 - 上下文管理器（2026-01-10）
+
+### 核心目标
+
+理解 with 语句的原理，掌握上下文管理器的使用和编写
+
+------
+
+### Why（不学会导致的工程死穴）
+
+如果不掌握上下文管理器，你会：
+
+- ❌ 资源泄漏（文件、数据库连接、锁等没有正确释放）
+- ❌ 写大量重复的 try-finally 代码
+- ❌ 异常时资源无法释放（程序崩溃导致资源占用）
+- ❌ 无法理解 Python 标准库和框架的核心机制
+
+**工程上的真实代价：**
+
+- 文件句柄泄漏 → 超过系统限制 → 程序无法打开新文件
+- 数据库连接不释放 → 连接池耗尽 → 新请求无法处理
+- 锁没有释放 → 死锁 → 整个系统卡死
+- 代码可维护性差（资源管理逻辑分散）
+
+**实际场景：**
+
+
+
+python
+
+```python
+# ❌ 传统方式：容易出错
+f = open('data.txt', 'r')
+try:
+    content = f.read()
+    process(content)
+finally:
+    f.close()  # 必须记得写
+
+# ✅ 上下文管理器：自动管理
+with open('data.txt', 'r') as f:
+    content = f.read()
+    process(content)
+# 自动关闭，即使发生异常
+```
+
+------
+
+### What（第一性原理 + 类比）
+
+#### **上下文管理器的本质**
+
+**定义：**
+
+> 上下文管理器 = 实现了 `__enter__` 和 `__exit__` 方法的对象
+
+**核心协议：**
+
+
+
+python
+
+```python
+class ContextManager:
+    def __enter__(self):
+        # 1. 进入 with 块时调用
+        # 2. 返回值赋给 as 后面的变量
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # 离开 with 块时调用
+        # 即使发生异常也会调用
+        # exc_type: 异常类型
+        # exc_val: 异常值
+        # exc_tb: 异常追踪信息
+        pass
+```
+
+------
+
+#### **with 语句的工作原理**
+
+**with 语句等价于：**
+
+
+
+python
+
+```python
+# with 语句
+with obj as value:
+    # with 块
+    pass
+
+# 等价于
+value = obj.__enter__()
+try:
+    # with 块
+    pass
+finally:
+    obj.__exit__(None, None, None)
+```
+
+**执行流程：**
+
+1. 调用 `__enter__()` 方法
+2. `__enter__()` 的返回值赋给 `as` 后的变量
+3. 执行 with 块内的代码
+4. 无论正常结束还是异常，都调用 `__exit__()`
+
+------
+
+#### **类比理解**
+
+**类比 Java 的 try-with-resources：**
+
+**Java (JDK 7+)：**
+
+
+
+java
+
+```java
+try (FileReader fr = new FileReader("file.txt")) {
+    // 使用 fr
+} // 自动调用 fr.close()
+```
+
+**Python：**
+
+
+
+python
+
+```python
+with open('file.txt', 'r') as f:
+    # 使用 f
+# 自动调用 f.close()
+```
+
+**本质一样：**
+
+- Java：实现 `AutoCloseable` 接口
+- Python：实现 `__enter__` 和 `__exit__` 方法
+
+------
+
+### How（最小可运行范式）
+
+#### **1. 使用内置的上下文管理器**
+
+**文件操作：**
+
+
+
+python
+
+```python
+# ❌ 传统方式
+f = open('data.txt', 'r')
+content = f.read()
+f.close()
+
+# ✅ 上下文管理器
+with open('data.txt', 'r') as f:
+    content = f.read()
+# 自动关闭
+```
+
+------
+
+#### **2. 自己写上下文管理器（类方式）**
+
+**基础模板：**
+
+
+
+python
+
+```python
+class MyContextManager:
+    def __init__(self, params):
+        # 初始化参数
+        self.params = params
+        
+    def __enter__(self):
+        # 进入 with 块时执行
+        # 获取资源、初始化状态
+        print("进入 with 块")
+        return self  # 返回值给 as 变量
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # 离开 with 块时执行
+        # 释放资源、清理状态
+        print("离开 with 块")
+        
+        # 处理异常（可选）
+        if exc_type is not None:
+            print(f"发生异常: {exc_type.__name__}")
+        
+        # return True: 抑制异常
+        # return False/None: 异常继续传播
+        return False
+
+# 使用
+with MyContextManager(params) as obj:
+    # with 块
+    pass
+```
+
+------
+
+**实例1：计时器**
+
+
+
+python
+
+```python
+import time
+
+class Timer:
+    def __enter__(self):
+        self.start = time.time()
+        print("开始计时")
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end = time.time()
+        print(f"耗时: {self.end - self.start:.4f}秒")
+
+# 使用
+with Timer() as t:
+    time.sleep(1)
+    print("执行任务")
+
+# 输出：
+# 开始计时
+# 执行任务
+# 耗时: 1.0012秒
+```
+
+------
+
+**实例2：数据库连接管理**
+
+
+
+python
+
+```python
+class DatabaseConnection:
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.connection = None
+    
+    def __enter__(self):
+        print(f"连接数据库: {self.db_name}")
+        # 实际项目中这里会真正连接数据库
+        self.connection = f"<连接到 {self.db_name}>"
+        return self.connection
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(f"关闭数据库: {self.db_name}")
+        # 实际项目中这里会关闭连接
+        self.connection = None
+
+# 使用
+with DatabaseConnection("user_db") as conn:
+    print(f"使用连接: {conn}")
+    print("执行查询...")
+
+# 输出：
+# 连接数据库: user_db
+# 使用连接: <连接到 user_db>
+# 执行查询...
+# 关闭数据库: user_db
+```
+
+------
+
+**实例3：切换目录**
+
+
+
+python
+
+```python
+import os
+
+class ChangeDirectory:
+    def __init__(self, path):
+        self.path = path
+        self.current_path = None
+        
+    def __enter__(self):
+        # 进入 with 块时才保存当前目录
+        self.current_path = os.getcwd()
+        os.chdir(self.path)
+        print(f"切换到: {self.path}")
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # 恢复原目录
+        os.chdir(self.current_path)
+        print(f"恢复到: {self.current_path}")
+
+# 使用
+print(f"原目录: {os.getcwd()}")
+with ChangeDirectory('/tmp'):
+    print(f"当前目录: {os.getcwd()}")
+
+print(f"恢复后: {os.getcwd()}")
+```
+
+------
+
+#### **3. 用 @contextmanager 装饰器（更简洁）**
+
+**需要导入：**
+
+
+
+python
+
+```python
+from contextlib import contextmanager
+```
+
+**基础模板：**
+
+
+
+python
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def my_context():
+    # __enter__ 部分：进入 with 块前执行
+    print("准备资源")
+    
+    try:
+        yield  # ← 暂停点，with 块在这里执行
+    finally:
+        # __exit__ 部分：离开 with 块后执行
+        print("清理资源")
+
+# 使用
+with my_context():
+    print("使用资源")
+
+# 输出：
+# 准备资源
+# 使用资源
+# 清理资源
+```
+
+------
+
+**@contextmanager 里 yield 的特殊用法：**
+
+**Day 3 的生成器 yield（返回值）：**
+
+
+
+python
+
+```python
+def count():
+    yield 1  # 返回 1
+    yield 2  # 返回 2
+
+for x in count():
+    print(x)  # 1, 2
+```
+
+**@contextmanager 的 yield（暂停点）：**
+
+
+
+python
+
+```python
+@contextmanager
+def my_context():
+    print("进入")
+    yield "可选的值"  # 暂停，返回值给 as
+    print("退出")
+
+with my_context() as value:
+    print(value)  # 可选的值
+
+# 输出：
+# 进入
+# 可选的值
+# 退出
+```
+
+**关键区别：**
+
+- 生成器 yield：可以多次 yield，每次返回一个值
+- @contextmanager yield：只能 yield 一次，标记 with 块位置
+  - yield 前 = `__enter__`
+  - yield 时 = 执行 with 块
+  - yield 后 = `__exit__`
+
+------
+
+**实例1：切换目录（@contextmanager 版本）**
+
+
+
+python
+
+```python
+from contextlib import contextmanager
+import os
+
+@contextmanager
+def change_directory(path):
+    # yield 前 = __enter__
+    current_path = os.getcwd()
+    os.chdir(path)
+    
+    try:
+        yield  # with 块在这里执行
+    finally:
+        # yield 后 = __exit__
+        os.chdir(current_path)
+
+# 使用（和类方式完全一样）
+with change_directory('/tmp'):
+    print(os.getcwd())  # /tmp
+```
+
+------
+
+**实例2：临时修改环境变量**
+
+
+
+python
+
+```python
+from contextlib import contextmanager
+import os
+
+@contextmanager
+def temp_env(key, value):
+    old_value = os.environ.get(key)
+    os.environ[key] = value
+    
+    try:
+        yield
+    finally:
+        if old_value is None:
+            del os.environ[key]
+        else:
+            os.environ[key] = old_value
+
+# 使用
+with temp_env('DEBUG', 'true'):
+    print(os.environ['DEBUG'])  # true
+```
+
+------
+
+**实例3：抑制特定异常**
+
+
+
+python
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_exception(exc_type):
+    try:
+        yield
+    except exc_type:
+        pass  # 忽略异常
+
+# 使用
+with suppress_exception(ValueError):
+    int('abc')  # ValueError 被抑制
+    print("这行不会执行")
+
+print("程序继续运行")
+```
+
+------
+
+#### **4. 异常处理**
+
+**`__exit__` 的参数含义：**
+
+
+
+python
+
+```python
+def __exit__(self, exc_type, exc_val, exc_tb):
+    # exc_type: 异常类型（如 ValueError）
+    # exc_val: 异常实例
+    # exc_tb: 异常追踪信息
+    
+    if exc_type is None:
+        # 正常退出，没有异常
+        print("正常结束")
+    else:
+        # 有异常发生
+        print(f"异常: {exc_type.__name__}: {exc_val}")
+    
+    # return True: 抑制异常（不向外传播）
+    # return False/None: 异常继续传播
+    return False
+```
+
+------
+
+**示例：异常处理**
+
+
+
+python
+
+```python
+class SafeOperation:
+    def __enter__(self):
+        print("开始操作")
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            print(f"出错了: {exc_val}")
+            return True  # 抑制异常
+        print("操作成功")
+        return False
+
+# 使用
+with SafeOperation():
+    print("执行中...")
+    raise ValueError("测试异常")
+    print("这行不会执行")
+
+print("程序继续运行")  # 因为异常被抑制了
+
+# 输出：
+# 开始操作
+# 执行中...
+# 出错了: 测试异常
+# 程序继续运行
+```
+
+------
+
+### Pitfall（真实踩坑）
+
+**坑1：在 \**init\** 里获取状态**
+
+
+
+python
+
+```python
+# ❌ 不好：过早获取状态
+class ChangeDirectory:
+    def __init__(self, path):
+        self.path = path
+        self.current_path = os.getcwd()  # 在 __init__ 时获取
+        
+    def __enter__(self):
+        os.chdir(self.path)
+
+# 问题：如果在创建对象和使用 with 之间目录变了，就不准了
+
+# ✅ 正确：在 __enter__ 时获取
+class ChangeDirectory:
+    def __init__(self, path):
+        self.path = path
+        self.current_path = None
+        
+    def __enter__(self):
+        self.current_path = os.getcwd()  # 进入时才获取
+        os.chdir(self.path)
+```
+
+------
+
+**坑2：忘记在 \**exit\** 里清理资源**
+
+
+
+python
+
+```python
+# ❌ 错误：没有清理
+class FileHandler:
+    def __enter__(self):
+        self.file = open('data.txt', 'r')
+        return self.file
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass  # 忘记关闭文件！
+
+# ✅ 正确：必须清理
+class FileHandler:
+    def __enter__(self):
+        self.file = open('data.txt', 'r')
+        return self.file
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.file.close()  # 确保关闭
+```
+
+------
+
+**坑3：@contextmanager 缺少 try-finally**
+
+
+
+python
+
+```python
+# ❌ 危险：异常时不会执行清理
+@contextmanager
+def my_context():
+    setup()
+    yield
+    cleanup()  # 如果 with 块抛异常，这行不会执行
+
+# ✅ 正确：用 try-finally 保证清理
+@contextmanager
+def my_context():
+    setup()
+    try:
+        yield
+    finally:
+        cleanup()  # 一定会执行
+```
+
+------
+
+**坑4：混淆 yield 的用法**
+
+
+
+python
+
+```python
+# ❌ 错误理解：以为可以多次 yield
+@contextmanager
+def wrong():
+    yield 1
+    yield 2  # ← 错误！@contextmanager 只能 yield 一次
+
+# ✅ 正确：只 yield 一次
+@contextmanager
+def correct():
+    yield "value"  # 只有一个 yield
+```
+
+------
+
+**坑5：return True 抑制所有异常**
+
+
+
+python
+
+```python
+# ❌ 危险：抑制了所有异常
+class BadContext:
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return True  # 所有异常都被吞掉
+
+# ✅ 正确：只抑制特定异常
+class GoodContext:
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is ValueError:
+            return True  # 只抑制 ValueError
+        return False  # 其他异常继续传播
+```
+
+------
+
+### Application（在哪里用）
+
+**实际应用场景：**
+
+**1. 文件和 I/O 操作**
+
+
+
+python
+
+```python
+# 文件
+with open('data.txt', 'r') as f:
+    data = f.read()
+
+# 网络连接
+with socket.socket() as s:
+    s.connect(('localhost', 8080))
+```
+
+**2. 数据库操作**
+
+
+
+python
+
+```python
+# 数据库连接
+with db.connect() as conn:
+    conn.execute("SELECT * FROM users")
+
+# 事务管理
+with db.transaction():
+    db.insert(...)
+    db.update(...)
+# 自动提交或回滚
+```
+
+**3. 锁和同步**
+
+
+
+python
+
+```python
+# 线程锁
+with lock:
+    critical_section()
+
+# 信号量
+with semaphore:
+    limited_resource()
+```
+
+**4. 临时状态管理**
+
+
+
+python
+
+```python
+# 临时切换目录
+with change_directory('/tmp'):
+    process_files()
+
+# 临时修改配置
+with temp_config(debug=True):
+    run_tests()
+```
+
+**5. 资源计量**
+
+
+
+python
+
+~~~python
+# 计时
+with Timer():
+    expensive_operation()
+
+# 内存监控
+with MemoryProfiler():
+    memory_intensive_task()
+```
+
+**在后续学习中的位置：**
+- Month 2（大模型应用）：API 连接管理
+- Month 3（RAG系统）：向量数据库连接管理
+- Month 5（Agent开发）：工具资源管理
+- Month 6（生产部署）：数据库事务、锁管理
+
+---
+
+### 视觉闭环
+```
+with 语句的执行流程：
+
+with obj as value:
+    # with 块
+    pass
+
+↓ 展开
+
+1. value = obj.__enter__()
+   ↓
+2. try:
+       # with 块
+   ↓
+3. finally:
+       obj.__exit__(exc_type, exc_val, exc_tb)
+
+---
+
+类方式 vs @contextmanager：
+
+类方式：
+class MyContext:
+    def __enter__(self):    ← 进入时
+        setup()
+        return value
+        
+    def __exit__(self, ...): ← 退出时
+        cleanup()
+
+@contextmanager 方式：
+@contextmanager
+def my_context():
+    setup()           ← __enter__ 部分
+    try:
+        yield value   ← with 块
+    finally:
+        cleanup()     ← __exit__ 部分
+
+---
+
+@contextmanager 的 yield 执行流程：
+
+@contextmanager
+def my_context():
+    print("1. 准备")
+    yield "value"
+    print("3. 清理")
+
+with my_context() as v:
+    print("2. 使用")
+
+执行顺序：
+1. 准备 → yield 暂停
+2. 使用 → with 块执行
+3. 清理 → yield 之后继续
+
+---
+
+异常处理流程：
+
+with 块正常：
+__enter__() → with 块 → __exit__(None, None, None)
+
+with 块异常：
+__enter__() → with 块异常 → __exit__(exc_type, exc_val, exc_tb)
+                                  ↓
+                          return True → 抑制异常
+                          return False → 异常传播
+~~~
+
+------
+
+### 工程师记忆分层
+
+**🗑️ 垃圾区（查文档就行）：**
+
+- `__exit__` 参数的详细含义
+- contextlib 模块的其他工具（suppress、closing等）
+- 更复杂的上下文管理器变体
+
+**🔍 索引区（记关键词）：**
+
+- 遇到"需要自动清理资源" → 想到上下文管理器
+- 写了 open/connect/acquire → 考虑用 with
+- 需要 try-finally → 考虑改成上下文管理器
+- 看到重复的获取/释放代码 → 封装成上下文管理器
+- 简单场景 → 用 @contextmanager
+- 复杂场景 → 用类方式
+
+**💎 核心区（必须内化）：**
+
+- 上下文管理器 = `__enter__` + `__exit__`
+- with 语句自动调用这两个方法
+- `__enter__` 返回值 → 给 as 变量
+- `__exit__` 一定会执行（即使异常）
+- @contextmanager 的 yield 是暂停点，不是返回值
+  - yield 前 = `__enter__`
+  - yield 后 = `__exit__`
+  - 必须用 try-finally 包裹 yield
+- return True 抑制异常，return False 传播异常
+- 在 `__enter__` 里获取状态，不是 `__init__`
+- 类方式 vs @contextmanager：
+  - 简单 → @contextmanager
+  - 需要保存状态 → 类方式
+
+---
+
