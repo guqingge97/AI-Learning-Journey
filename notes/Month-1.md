@@ -3292,3 +3292,875 @@ __enter__() → with 块异常 → __exit__(exc_type, exc_val, exc_tb)
 
 ---
 
+## Day 7 - 异步编程入门（2026-01-11）
+
+### 核心目标
+
+理解异步编程的概念，掌握 async/await 基础语法
+
+------
+
+### Why（不学会导致的工程死穴）
+
+如果不掌握异步编程，你会：
+
+- ❌ I/O 密集型任务效率极低（串行等待，浪费大量时间）
+- ❌ 无法处理高并发场景（每个请求都阻塞）
+- ❌ 无法理解现代 Python 框架（FastAPI、aiohttp 等都基于异步）
+- ❌ 在 AI 应用开发中遇到瓶颈（调用大模型 API 必须用异步）
+
+**工程上的真实代价：**
+
+- API 调用串行执行 → 10 个请求需要 10 秒，而不是 1 秒
+- 数据库查询阻塞 → 无法处理多个用户请求
+- 文件批量处理效率低 → 处理 100 个文件需要几小时
+- 系统吞吐量低 → 无法支撑生产环境
+
+**实际场景：**
+
+
+
+python
+
+~~~python
+# ❌ 同步方式：调用 10 个 API
+for i in range(10):
+    result = requests.get(api_url)
+# 总耗时：10 × 1秒 = 10秒
+
+# ✅ 异步方式：并行调用
+results = await asyncio.gather(*[
+    fetch_api(url) for url in urls
+])
+# 总耗时：约 1 秒
+```
+
+---
+
+### What（第一性原理 + 类比）
+
+#### **同步 vs 异步**
+
+**同步（Synchronous）：**
+> 一件一件做，做完一件再做下一件
+
+**类比：**
+```
+烧水（5分钟）→ 等水烧开 → 洗菜（3分钟）→ 切菜（2分钟）
+总耗时：10 分钟
+```
+
+**异步（Asynchronous）：**
+> 等待时可以做其他事，多件事同时进行
+
+**类比：**
+```
+开始烧水 → 等水烧的时候去洗菜 → 再切菜
+总耗时：5 分钟（烧水时间）
+~~~
+
+------
+
+#### **什么任务适合异步？**
+
+**I/O 密集型任务（适合异步）：**
+
+- 网络请求（API 调用、下载文件）
+- 文件读写（读取大文件）
+- 数据库查询
+- 等待用户输入
+
+**特点：**
+
+- CPU 大部分时间在等待外部响应
+- 等待时 CPU 闲置
+- 可以利用等待时间做其他事
+
+------
+
+**CPU 密集型任务（不适合异步）：**
+
+- 大量计算（如计算 1+2+3+...+1000000）
+- 图像处理
+- 数据分析
+
+**特点：**
+
+- CPU 一直在工作
+- 没有等待时间
+- 异步帮不上忙（需要多进程）
+
+------
+
+#### **Python 异步编程的核心概念**
+
+**1. 协程（Coroutine）**
+
+
+
+python
+
+```python
+async def my_function():
+    # 这是一个协程
+    pass
+```
+
+- 用 `async def` 定义的函数
+- 可以暂停和恢复执行
+- 是异步编程的基础单元
+
+------
+
+**2. async 关键字**
+
+
+
+python
+
+```python
+async def download_file():
+    # 异步函数
+    pass
+```
+
+**作用：** 定义异步函数（协程）
+
+------
+
+**3. await 关键字**
+
+
+
+python
+
+```python
+result = await some_async_function()
+```
+
+**两个核心作用：**
+
+**作用1：让异步函数真正执行，并获取结果**
+
+
+
+python
+
+```python
+# ❌ 没有 await：函数不会执行
+async def main():
+    task()  # 只是创建协程对象，不执行
+
+# ✅ 有 await：函数会执行
+async def main():
+    await task()  # 真正执行
+```
+
+**作用2：等待时释放控制权（让其他任务执行）**
+
+
+
+python
+
+```python
+async def task1():
+    print("任务1开始")
+    await asyncio.sleep(2)  # 等待时，切换到其他任务
+    print("任务1结束")
+
+async def task2():
+    print("任务2开始")
+    await asyncio.sleep(2)
+    print("任务2结束")
+
+# 并行执行：任务1等待时，任务2可以执行
+await asyncio.gather(task1(), task2())
+```
+
+**关键理解：**
+
+- await 不是"傻等"
+- await 是"我在等待，但我去做别的事"
+- 这是异步能并行的原因
+
+------
+
+**4. asyncio.run()**
+
+
+
+python
+
+```python
+asyncio.run(main())
+```
+
+**作用：** 启动异步程序的入口点
+
+------
+
+#### **为什么需要多层 await？**
+
+**规则：**
+
+> async 函数调用 async 函数，必须用 await
+
+**原因：**
+
+1. async 函数不会自动执行
+2. 没有 await，只是创建协程对象
+3. 有 await，协程才会真正执行
+
+**例子：**
+
+
+
+python
+
+~~~python
+async def level3():
+    await asyncio.sleep(1)  # ← 异步操作需要 await
+
+async def level2():
+    await level3()  # ← 调用 async 函数需要 await
+
+async def level1():
+    await level2()  # ← 调用 async 函数需要 await
+
+asyncio.run(level1())  # ← 启动入口
+```
+
+**调用链：**
+```
+asyncio.run → await level1 → await level2 → await level3 → await sleep
+~~~
+
+每一层都需要 await，就像传递接力棒。
+
+------
+
+#### **即使不需要返回值，也必须 await**
+
+**错误理解：**
+
+> "我的异步函数只是下载文件，不返回值，不需要 await"
+
+**正确理解：**
+
+> "调用 async 函数必须 await，和是否需要返回值无关"
+
+**例子：**
+
+
+
+python
+
+```python
+async def download_file(url, filename):
+    print(f"开始下载 {filename}")
+    await asyncio.sleep(2)  # 模拟下载
+    with open(filename, 'w') as f:
+        f.write("内容")
+    print(f"{filename} 下载完成")
+    # 没有 return
+
+async def main():
+    # ❌ 错误：文件不会被下载
+    download_file("url", "file.txt")
+    
+    # ✅ 正确：文件会被下载
+    await download_file("url", "file.txt")
+
+asyncio.run(main())
+```
+
+**原因：**
+
+- 不用 await → async 函数不会执行
+- 用 await → 函数执行，且可以并行
+
+------
+
+### How（最小可运行范式）
+
+#### **1. 基础异步函数**
+
+
+
+python
+
+~~~python
+import asyncio
+
+async def hello():
+    print("Hello")
+    await asyncio.sleep(1)
+    print("World")
+
+# 运行
+asyncio.run(hello())
+```
+
+**输出：**
+```
+Hello
+World    ← 1秒后
+~~~
+
+------
+
+#### **2. 并行执行多个任务**
+
+**串行执行（慢）：**
+
+
+
+python
+
+~~~python
+import asyncio
+
+async def task(name, seconds):
+    print(f"{name} 开始")
+    await asyncio.sleep(seconds)
+    print(f"{name} 结束")
+
+async def main():
+    await task("任务1", 2)
+    await task("任务2", 2)
+
+asyncio.run(main())
+# 总耗时：4秒
+```
+
+**输出：**
+```
+任务1 开始
+任务1 结束    ← 2秒后
+任务2 开始
+任务2 结束    ← 再过2秒
+~~~
+
+------
+
+**并行执行（快）：**
+
+
+
+python
+
+~~~python
+import asyncio
+
+async def task(name, seconds):
+    print(f"{name} 开始")
+    await asyncio.sleep(seconds)
+    print(f"{name} 结束")
+    return f"{name} 完成"
+
+async def main():
+    # asyncio.gather 并行执行
+    results = await asyncio.gather(
+        task("任务1", 2),
+        task("任务2", 2),
+        task("任务3", 2)
+    )
+    print(f"结果: {results}")
+
+asyncio.run(main())
+# 总耗时：2秒
+```
+
+**输出：**
+```
+任务1 开始
+任务2 开始
+任务3 开始
+任务1 结束    ← 2秒后（几乎同时）
+任务2 结束
+任务3 结束
+结果: ['任务1 完成', '任务2 完成', '任务3 完成']
+~~~
+
+------
+
+#### **3. 实际应用：并发 API 请求**
+
+
+
+python
+
+```python
+import asyncio
+import aiohttp  # 异步 HTTP 库
+
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        data = await response.text()
+        return len(data)
+
+async def main():
+    urls = [
+        "https://api1.com/data",
+        "https://api2.com/data",
+        "https://api3.com/data"
+    ]
+    
+    async with aiohttp.ClientSession() as session:
+        # 并行请求所有 URL
+        results = await asyncio.gather(
+            *[fetch_url(session, url) for url in urls]
+        )
+    
+    print(f"获取了 {len(results)} 个结果")
+    print(f"数据大小: {results}")
+
+asyncio.run(main())
+```
+
+**优势：**
+
+- 3 个请求并行执行
+- 总耗时 ≈ 最慢的那个请求
+- 而不是 3 个请求时间相加
+
+------
+
+#### **4. 批量下载文件（不需要返回值）**
+
+
+
+python
+
+~~~python
+import asyncio
+
+async def download_file(url, filename):
+    print(f"开始下载 {filename}")
+    await asyncio.sleep(2)  # 模拟下载耗时
+    
+    # 保存文件
+    with open(filename, 'w') as f:
+        f.write(f"从 {url} 下载的内容")
+    
+    print(f"{filename} 下载完成")
+    # 没有 return
+
+async def main():
+    files = [
+        ("http://url1.com", "file1.txt"),
+        ("http://url2.com", "file2.txt"),
+        ("http://url3.com", "file3.txt")
+    ]
+    
+    # 并行下载（即使不需要返回值，也要 await）
+    await asyncio.gather(
+        *[download_file(url, name) for url, name in files]
+    )
+    
+    print("全部下载完成")
+
+asyncio.run(main())
+```
+
+**输出：**
+```
+开始下载 file1.txt
+开始下载 file2.txt
+开始下载 file3.txt
+file1.txt 下载完成    ← 2秒后
+file2.txt 下载完成
+file3.txt 下载完成
+全部下载完成
+
+总耗时：2秒（而不是6秒）
+~~~
+
+------
+
+#### **5. 常用 asyncio 工具**
+
+**asyncio.gather() - 并行执行多个任务**
+
+
+
+python
+
+```python
+# 同时执行多个任务，等待全部完成
+results = await asyncio.gather(
+    task1(),
+    task2(),
+    task3()
+)
+# results = [task1结果, task2结果, task3结果]
+```
+
+------
+
+**asyncio.create_task() - 创建后台任务**
+
+
+
+python
+
+```python
+async def background_task():
+    await asyncio.sleep(5)
+    print("后台任务完成")
+
+async def main():
+    # 创建后台任务（不立即等待）
+    task = asyncio.create_task(background_task())
+    
+    print("做其他事")
+    await asyncio.sleep(1)
+    
+    # 等待后台任务完成
+    await task
+
+asyncio.run(main())
+```
+
+------
+
+**asyncio.wait_for() - 设置超时**
+
+
+
+python
+
+```python
+async def slow_operation():
+    await asyncio.sleep(10)
+    return "完成"
+
+async def main():
+    try:
+        # 最多等 3 秒
+        result = await asyncio.wait_for(
+            slow_operation(), 
+            timeout=3
+        )
+    except asyncio.TimeoutError:
+        print("操作超时")
+
+asyncio.run(main())
+```
+
+------
+
+### Pitfall（真实踩坑）
+
+**坑1：忘记 await**
+
+
+
+python
+
+```python
+# ❌ 错误：async 函数不会执行
+async def main():
+    download_file("url", "file.txt")  # 缺少 await
+    print("结束")
+
+asyncio.run(main())
+
+# 输出：
+# 结束
+# （文件没有下载）
+
+# ✅ 正确：必须 await
+async def main():
+    await download_file("url", "file.txt")
+    print("结束")
+```
+
+------
+
+**坑2：在非 async 函数里用 await**
+
+
+
+python
+
+```python
+# ❌ 错误：await 只能在 async 函数里使用
+def my_function():
+    await asyncio.sleep(1)  # SyntaxError
+
+# ✅ 正确：必须是 async 函数
+async def my_function():
+    await asyncio.sleep(1)
+```
+
+------
+
+**坑3：混用同步和异步**
+
+
+
+python
+
+```python
+# ❌ 错误：在异步函数里用同步 sleep
+import time
+
+async def task():
+    time.sleep(2)  # 阻塞！其他任务也无法执行
+
+# ✅ 正确：用异步 sleep
+async def task():
+    await asyncio.sleep(2)  # 不阻塞，其他任务可以执行
+```
+
+------
+
+**坑4：忘记 asyncio.run()**
+
+
+
+python
+
+```python
+# ❌ 错误：直接调用异步函数
+async def main():
+    print("Hello")
+
+main()  # 返回协程对象，不会执行
+
+# ✅ 正确：用 asyncio.run() 启动
+asyncio.run(main())
+```
+
+------
+
+**坑5：以为不需要返回值就不需要 await**
+
+
+
+python
+
+```python
+# ❌ 错误理解
+async def save_data(data):
+    # 保存数据，不返回值
+    pass
+
+async def main():
+    # "不需要返回值，所以不用 await"（错误！）
+    save_data(data)  # 函数不会执行
+
+# ✅ 正确：即使不需要返回值，也必须 await
+async def main():
+    await save_data(data)  # 函数会执行
+```
+
+------
+
+### Application（在哪里用）
+
+**实际应用场景：**
+
+**1. 大模型 API 批量调用**
+
+
+
+python
+
+```python
+async def call_llm(prompt):
+    # 调用 Claude/GPT API
+    response = await client.messages.create(...)
+    return response
+
+# 批量调用
+prompts = ["问题1", "问题2", "问题3"]
+results = await asyncio.gather(
+    *[call_llm(p) for p in prompts]
+)
+```
+
+**2. RAG 系统的并行检索**
+
+
+
+python
+
+```python
+async def search_vector_db(query):
+    # 搜索向量数据库
+    pass
+
+async def search_web(query):
+    # 搜索网络
+    pass
+
+# 并行搜索多个数据源
+results = await asyncio.gather(
+    search_vector_db(query),
+    search_web(query)
+)
+```
+
+**3. 批量数据处理**
+
+
+
+python
+
+```python
+# 批量处理用户数据
+user_ids = [1, 2, 3, ..., 100]
+results = await asyncio.gather(
+    *[process_user(uid) for uid in user_ids]
+)
+```
+
+**4. Web 爬虫**
+
+
+
+python
+
+~~~python
+# 并发爬取多个页面
+urls = [url1, url2, url3, ...]
+pages = await asyncio.gather(
+    *[fetch_page(url) for url in urls]
+)
+```
+
+**在后续学习中的位置：**
+- Month 2（大模型应用）：异步调用大模型 API
+- Month 3（RAG系统）：并行检索多个数据源
+- Month 5（Agent开发）：Agent 并发执行多个工具
+- Month 6（生产部署）：FastAPI 异步接口开发
+
+---
+
+### 视觉闭环
+```
+同步 vs 异步执行对比：
+
+同步执行（串行）：
+任务1 ████████ (2秒)
+              任务2 ████████ (2秒)
+                            任务3 ████████ (2秒)
+总耗时：6秒
+
+异步执行（并行）：
+任务1 ████████ (2秒)
+任务2 ████████ (2秒)
+任务3 ████████ (2秒)
+总耗时：2秒
+
+---
+
+await 的执行流程：
+
+async def task1():
+    print("A")
+    await asyncio.sleep(1)  ← 暂停，释放控制权
+    print("B")
+
+async def task2():
+    print("C")
+    await asyncio.sleep(1)  ← 暂停，释放控制权
+    print("D")
+
+await asyncio.gather(task1(), task2())
+
+执行顺序：
+A → C → (等待1秒) → B → D
+
+---
+
+调用链中的 await：
+
+asyncio.run(level1())
+    ↓
+async def level1():
+    await level2()  ← 必须 await
+        ↓
+    async def level2():
+        await level3()  ← 必须 await
+            ↓
+        async def level3():
+            await asyncio.sleep(1)  ← 必须 await
+
+每一层都需要 await，否则不会执行
+
+---
+
+即使不需要返回值也要 await：
+
+async def download(url):
+    # 下载文件，不返回值
+    pass
+
+# ❌ 错误：不会下载
+download(url)
+
+# ✅ 正确：会下载
+await download(url)
+
+# ✅ 并行下载
+await asyncio.gather(
+    download(url1),
+    download(url2)
+)
+~~~
+
+------
+
+### 工程师记忆分层
+
+**🗑️ 垃圾区（查文档就行）：**
+
+- asyncio 模块的所有方法
+- 各种异步库的具体用法
+- 异步上下文管理器的详细实现
+- 异步生成器的高级用法
+
+**🔍 索引区（记关键词）：**
+
+- 遇到"多个 I/O 操作" → 想到异步
+- 遇到"API 批量调用" → 想到 asyncio.gather
+- 遇到"并发" → 想到异步
+- 需要超时控制 → 想到 asyncio.wait_for
+- 后台任务 → 想到 asyncio.create_task
+- 看到 async def → 知道是异步函数
+- 调用 async 函数 → 记得用 await
+
+**💎 核心区（必须内化）：**
+
+- 异步适合 I/O 密集型任务，不适合 CPU 密集型
+
+- `async def` 定义异步函数（协程）
+
+- ```
+  await
+  ```
+
+   有两个作用：
+
+  1. 让异步函数执行并获取结果
+  2. 等待时释放控制权，让其他任务执行
+
+- 调用 async 函数必须用 await（无论是否需要返回值）
+
+- 在非 async 函数里不能用 await
+
+- `asyncio.run()` 是异步程序入口
+
+- `asyncio.gather()` 并行执行多个任务
+
+- 同步代码（time.sleep）会阻塞，异步代码（asyncio.sleep）不会
+
+- 多层 async 函数调用，每层都需要 await
+
+- await 不是"傻等"，而是"等待时做其他事"
+
+---
+
