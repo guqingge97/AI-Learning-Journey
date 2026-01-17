@@ -1,0 +1,14 @@
+pyproject.toml
+M1w2d4/__init__.py
+M1w2d4.egg-info/PKG-INFO
+M1w2d4.egg-info/SOURCES.txt
+M1w2d4.egg-info/dependency_links.txt
+M1w2d4.egg-info/top_level.txt
+M1w2d4/base/__init__.py
+M1w2d4/base/models.py
+M1w2d4/base/client/__init__.py
+M1w2d4/base/client/mock_client.py
+M1w2d4/base/client/real_client.py
+M1w2d4/base/service/__init__.py
+tests/__init.py
+tests/test_user_service.py

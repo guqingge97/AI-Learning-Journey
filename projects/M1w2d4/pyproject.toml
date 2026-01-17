@@ -1,0 +1,6 @@
+[project]
+name = "M1w2d4"
+version = "0.1.0"
+
+[tool.setuptools.packages.find]
+where = ["M1w2d4"]
