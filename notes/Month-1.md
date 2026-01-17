@@ -4613,10 +4613,256 @@ python demo.py
 ## Git 提交
 
 ```bash
-git add .
+git add ./
 git commit -m "M1-W2-D2: Type Hints + dataclass"
 git push
 ```
+
+---
+
+# 全栈宗师笔记：M1-W2-D3 模块化
+
+## Phase
+
+Month 1 - Python 工程基石 > Week 2 - OOP + 类型系统 > Day 3 - 模块化
+
+## 今日核心目标
+
+把代码按职责组织成 Python 包结构，实现"一眼能看出每个模块是干什么的"
+
+------
+
+## Why：不学会导致的工程死穴
+
+所有代码堆在一个文件里（比如 500 行的 main.py）会导致：
+
+| 问题     | 后果                                     |
+| -------- | ---------------------------------------- |
+| 找代码难 | 想改 UserClient，要在 500 行里翻         |
+| 改代码怕 | 改一个地方，不知道影响哪里               |
+| 测试难   | 想单独测 Service，但它和 Client 混在一起 |
+| 协作冲突 | 两个人都改 main.py，必然冲突             |
+
+**Java 对比**：`com.company.service`、`com.company.dao` 这种分包思想，Python 一样需要。
+
+------
+
+## What：Python 包结构的第一性原理
+
+### 核心概念 1：`__init__.py` = 包的身份证
+
+```
+week2_skeleton/
+├── __init__.py          ← 有这个，Python 才认这是个包
+├── client/
+│   ├── __init__.py      ← 子包也要有
+│   └── ...
+```
+
+**没有 `__init__.py` 会怎样？**
+
+```python
+from week2_skeleton.client import MockUserClient
+# → 报错：ModuleNotFoundError
+```
+
+### 核心概念 2：`__init__.py` 控制导出
+
+```python
+# client/__init__.py
+from .protocol import UserClient
+from .mock_client import MockUserClient
+from .real_client import RealUserClient
+
+__all__ = ["UserClient", "MockUserClient", "RealUserClient"]
+```
+
+效果：
+
+```python
+# 简洁写法（推荐）
+from week2_skeleton.client import MockUserClient
+
+# 而不是
+from week2_skeleton.client.mock_client import MockUserClient
+```
+
+### 核心概念 3：`python -m` 运行方式
+
+```bash
+# ✅ 正确：把当前目录加入 Python 路径
+python -m week2_skeleton.main
+
+# ❌ 错误：路径设置不对，导入会失败
+python week2_skeleton/main.py
+```
+
+------
+
+## How：最小可运行范式
+
+### 标准包结构
+
+```
+week2_skeleton/
+├── __init__.py              # 顶层包标识
+├── client/
+│   ├── __init__.py          # 导出：UserClient, MockUserClient, RealUserClient
+│   ├── protocol.py          # Protocol 定义
+│   ├── mock_client.py       # Mock 实现
+│   └── real_client.py       # 真实实现
+├── service/
+│   ├── __init__.py          # 导出：UserService
+│   └── user_service.py      # 业务逻辑
+├── models/
+│   ├── __init__.py          # 导出：User
+│   └── user.py              # 数据模型
+└── main.py                  # 入口脚本
+```
+
+### 相对导入语法
+
+```python
+# 在 client/__init__.py 中
+from .protocol import UserClient      # . = 当前包
+from .mock_client import MockUserClient
+```
+
+### 跨包导入语法
+
+```python
+# 在 service/user_service.py 中
+from week2_skeleton.client import UserClient    # 绝对导入
+from week2_skeleton.models import User
+```
+
+------
+
+## Pitfall：真实踩坑
+
+### 坑 1：文件命名用 PascalCase
+
+```python
+# ❌ Java 习惯：AdminClient.py
+# ✅ Python 规范：admin_client.py（文件名 snake_case，类名 PascalCase）
+```
+
+### 坑 2：忘记 `__init__.py`
+
+```python
+# 新建了 utils/ 目录，忘记加 __init__.py
+from week2_skeleton.utils import helper  # → ModuleNotFoundError
+```
+
+### 坑 3：直接运行包内脚本
+
+```bash
+# ❌ 这样跑，from week2_skeleton.xxx 会失败
+python week2_skeleton/main.py
+
+# ✅ 用 -m 方式
+python -m week2_skeleton.main
+```
+
+------
+
+## Application：在 RAG/Agent/架构中的位置
+
+```
+LLM 应用项目结构（预览）
+├── clients/           # 各种外部 API 客户端
+│   ├── llm_client.py      # LLM API
+│   ├── embedding_client.py # Embedding API
+│   └── vector_db_client.py # 向量数据库
+├── services/          # 业务逻辑
+│   ├── rag_service.py     # RAG 检索+生成
+│   └── agent_service.py   # Agent 调度
+├── models/            # 数据结构
+│   ├── document.py        # 文档
+│   └── message.py         # 消息
+└── main.py            # 入口
+```
+
+模块化是**所有后续项目的基础骨架**，Month 2 开始的 LLMClient、RAG 系统都会用这个结构。
+
+------
+
+## 视觉闭环
+
+```
+代码组织演进
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+阶段 1：单文件
+┌─────────────────────────────┐
+│  main.py (500 行)           │
+│  - User class               │
+│  - MockClient               │
+│  - RealClient               │
+│  - UserService              │
+│  - main()                   │
+└─────────────────────────────┘
+    ↓ 问题：混乱、难测试、协作冲突
+
+阶段 2：模块化（今天学的）
+┌─────────────────────────────┐
+│  week2_skeleton/            │
+│  ├── models/                │
+│  │   └── user.py            │
+│  ├── client/                │
+│  │   ├── protocol.py        │
+│  │   ├── mock_client.py     │
+│  │   └── real_client.py     │
+│  ├── service/               │
+│  │   └── user_service.py    │
+│  └── main.py                │
+└─────────────────────────────┘
+    ✅ 职责清晰、可独立测试、易协作
+```
+
+------
+
+## 工程师记忆分层
+
+### 🗑️ 垃圾区（查文档）
+
+- `__all__` 的完整语法
+- 相对导入的各种写法（`..` 上级包等）
+
+### 🔍 索引区（记关键词）
+
+- "运行包内脚本 → `python -m`"
+- "导出控制 → `__init__.py` + `__all__`"
+- "文件名 → snake_case"
+
+### 💎 核心区（必须内化）
+
+- **每个包目录必须有 `__init__.py`**
+- **`python -m 包名.模块名` 是正确的运行方式**
+- **按职责分包：client / service / models**
+
+------
+
+## 今日命令速查
+
+```bash
+# 运行包内脚本
+python -m week2_skeleton.main
+
+# 查看包结构
+tree week2_skeleton/  # 或用 ls -la
+```
+
+------
+
+## 关联回顾
+
+| 昨天 (D2)                             | 今天 (D3)                       |
+| ------------------------------------- | ------------------------------- |
+| Type Hints + dataclass 定义接口和数据 | 把这些代码组织成包结构          |
+| User、UserClient、UserService 的定义  | 放入 models/、client/、service/ |
+
+**明天 (D4)**：给这个骨架加上 pytest 测试，验证 MockClient 注入是否能让 Service 独立测试。
 
 ---
 
