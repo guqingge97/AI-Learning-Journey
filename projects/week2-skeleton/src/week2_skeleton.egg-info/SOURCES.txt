@@ -1,0 +1,16 @@
+pyproject.toml
+src/week2_skeleton/__init__.py
+src/week2_skeleton/config.py
+src/week2_skeleton.egg-info/PKG-INFO
+src/week2_skeleton.egg-info/SOURCES.txt
+src/week2_skeleton.egg-info/dependency_links.txt
+src/week2_skeleton.egg-info/requires.txt
+src/week2_skeleton.egg-info/top_level.txt
+src/week2_skeleton/clients/__init__.py
+src/week2_skeleton/clients/mock_client.py
+src/week2_skeleton/clients/protocol.py
+src/week2_skeleton/clients/real_client.py
+src/week2_skeleton/models/__init__.py
+src/week2_skeleton/service/__init__.py
+src/week2_skeleton/utils/logger.py
+tests/test_service.py
