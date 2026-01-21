@@ -5706,3 +5706,139 @@ M1w2we1/                   │   └── utils/
 
 ---
 
+# M1-W3-D1
+
+## Phase
+
+Month 1 Week 3 - 工程模板化
+
+## 今日核心目标
+
+掌握 uv + src 布局，让项目**可复现、可维护**
+
+------
+
+## Why：不学会导致的工程死穴
+
+- 同事 clone 代码跑不起来（依赖没记录）
+- 项目大了文件乱成一团（代码/测试/配置混在一起）
+- 换台电脑环境就崩（依赖版本不一致）
+
+------
+
+## What：第一性原理
+
+**依赖管理**：让任何人在任何机器上，一条命令还原你的运行环境
+
+**src 布局**：源代码与其他文件（测试、配置、文档）物理隔离
+
+| Python         | Java 类比          |
+| -------------- | ------------------ |
+| uv             | Maven / Gradle     |
+| pyproject.toml | pom.xml            |
+| uv.lock        | 锁定的版本号       |
+| .venv/         | 项目本地的依赖目录 |
+
+------
+
+## How：最小可运行范式
+
+
+
+bash
+
+```bash
+# 创建项目
+uv init python-app-template
+cd python-app-template
+
+# 添加依赖（自动记录）
+uv add python-dotenv
+
+# 同步环境
+uv sync
+
+# 运行代码
+uv run python -m python_app_template.main
+```
+
+**pyproject.toml 关键配置**：
+
+
+
+toml
+
+~~~toml
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/python_app_template"]
+```
+
+---
+
+## Pitfall：真实踩坑
+
+| 坑 | 原因 | 解法 |
+|----|------|------|
+| `uv: command not found` | PATH 没生效 | `source $HOME/.local/bin/env` |
+| import 写 `from src.xxx` | 多了 `src.` 前缀 | 直接 `from python_app_template.xxx` |
+| 改代码要重新打包？ | 不需要，可编辑模式安装 | 直接跑，热生效 |
+
+---
+
+## Application：在 RAG/Agent/架构中的位置
+
+- **现在**：所有后续项目的起点模板
+- **Month 2+**：LLMClient、RAG、Agent 都基于这个结构
+- **生产环境**：标准 src 布局是开源项目和企业项目的通用规范
+
+---
+
+## 视觉闭环
+```
+┌─────────────────────────────────────────┐
+│           python-app-template/          │
+├─────────────────────────────────────────┤
+│  pyproject.toml    ← 依赖 + 配置中心    │
+│  uv.lock           ← 版本锁定           │
+│  .venv/            ← 隔离环境           │
+├─────────────────────────────────────────┤
+│  src/                                   │
+│   └── python_app_template/              │
+│        ├── main.py     ← 入口           │
+│        ├── client/     ← 外部调用       │
+│        ├── service/    ← 业务逻辑       │
+│        └── utils/      ← 工具函数       │
+├─────────────────────────────────────────┤
+│  tests/              ← 测试（与 src 分离）│
+└─────────────────────────────────────────┘
+~~~
+
+------
+
+## 工程师记忆分层
+
+🗑️ **垃圾区（查文档）**
+
+- hatchling 具体配置语法
+- uv 的所有子命令
+
+🔍 **索引区（记关键词）**
+
+- `uv init` / `uv add` / `uv sync` / `uv run`
+- pyproject.toml 三段配置（tool.uv / build-system / tool.hatch）
+
+💎 **核心区（必须内化）**
+
+- **uv add 自动记录依赖，不再手动管 requirements.txt**
+- **src 布局：源代码统一放 src/ 下**
+- **import 路径不含 src.，从包名开始**
+
+---
+
