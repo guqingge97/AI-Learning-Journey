@@ -9,3 +9,4 @@ from ..model import User
 class UserClient(Protocol):
     def get_user(self, user_id: int) -> User:
         ...
+

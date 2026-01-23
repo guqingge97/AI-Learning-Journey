@@ -17,8 +17,15 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.408",
     "pytest>=9.0.2",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/python_app_template"]
+
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"

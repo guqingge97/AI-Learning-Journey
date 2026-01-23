@@ -5,10 +5,13 @@
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class User:
     id: int
     name: str
     age: int
+    email: Optional[str] = None
+
 

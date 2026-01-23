@@ -6013,3 +6013,219 @@ Fixture + AAA 是所有测试的骨架，后面只是被测对象变复杂了。
 
 ---
 
+# 全栈宗师笔记：M1
+
+## Phase
+
+Month 1 · Week 3 · Day 4 —— Python 工程基石 / 工程模板化
+
+## 今日核心目标
+
+用 pyright 在运行前发现类型错误，把 type hints 从"注释"变成"约束"
+
+------
+
+## Why：不学会导致的工程死穴
+
+
+
+python
+
+~~~python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+result = greet(123)  # Python 照跑不误！
+```
+
+type hints 是**弱约束**，Python 解释器完全忽略。
+
+后果：
+- 辛苦写的类型标注形同虚设
+- 类型错误直到线上才暴露
+- 团队协作时接口约定无法强制执行
+
+---
+
+## What：第一性原理
+```
+┌─────────────────────────────────────────┐
+│  Python = 动态类型语言                   │
+│  type hints = 给人/工具看的"注释"        │
+│  pyright = 把注释变成强制检查的工具      │
+└─────────────────────────────────────────┘
+~~~
+
+**类比**：
+
+- type hints = 交通标志（告诉你限速60）
+- Python 解释器 = 不装摄像头的路（超速也没人管）
+- pyright = 测速摄像头（超速立刻报警）
+
+------
+
+## How：最小可运行范式
+
+### 1. 安装配置
+
+
+
+bash
+
+```bash
+uv add --dev pyright
+```
+
+
+
+json
+
+```json
+// pyrightconfig.json
+{
+  "include": ["src"],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic"
+}
+```
+
+### 2. 运行检查
+
+
+
+bash
+
+```bash
+uv run pyright src
+```
+
+### 3. 常见类型标注速查
+
+
+
+python
+
+```python
+# 基本类型
+name: str = "十香"
+age: int = 29
+
+# 容器类型
+names: list[str] = ["A", "B"]
+scores: dict[str, int] = {"A": 90}
+
+# 可选类型（允许 None）
+email: str | None = None          # 新写法
+email: Optional[str] = None       # 旧写法，需 from typing import Optional
+
+# 函数无返回值
+def log(msg: str) -> None:
+    print(msg)
+```
+
+### 4. Optional vs 默认值（易混淆）
+
+
+
+python
+
+~~~python
+# 必须传，允许 str 或 None
+name: Optional[str]
+
+# 可不传，默认 None，允许 str 或 None  
+name: Optional[str] = None
+
+# 可不传，默认 None，但 pyright 报错（str 不接受 None）
+name: str = None  # ❌
+```
+
+---
+
+## Pitfall：真实踩坑
+
+| 坑 | 表现 | 解法 |
+|---|---|---|
+| pyproject.toml 解析警告 | 一堆 parse error 输出 | 用 pyrightconfig.json 替代 |
+| Optional 和默认值混淆 | 以为 Optional 控制"是否必传" | Optional 控制"允许什么值"，`=` 控制"是否必传" |
+| 忘记跑检查 | type hints 写了但没检查 | CI 集成（明天学） |
+
+---
+
+## Application：在 RAG/Agent/架构中的位置
+```
+┌─────────────────────────────────────────────┐
+│              LLM 应用项目                    │
+├─────────────────────────────────────────────┤
+│  models.py    → dataclass + 类型标注        │
+│  client.py    → Protocol 接口定义           │
+│  services.py  → 返回值 User | None          │
+├─────────────────────────────────────────────┤
+│  pyright      → CI 前置检查，类型不对不合并  │
+└─────────────────────────────────────────────┘
+```
+
+真实场景：
+- LLMClient 返回 `ChatResponse | None`
+- RAG 检索返回 `list[Document]`
+- Agent 工具调用参数必须类型正确
+
+---
+
+## 视觉闭环：类型检查工作流
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  写代码      │ → │  pyright     │ → │  运行代码    │
+│  + type hints│    │  静态检查    │    │              │
+└──────────────┘    └──────────────┘    └──────────────┘
+                          │
+                          ▼
+                    ┌──────────────┐
+                    │  类型错误？   │
+                    │  立刻报警！   │
+                    └──────────────┘
+~~~
+
+------
+
+## 工程师记忆分层
+
+### 🗑️ 垃圾区（查文档）
+
+- pyrightconfig.json 的所有配置项
+- typing 模块的全部类型（Callable、TypeVar 等）
+
+### 🔍 索引区（记关键词）
+
+- `typeCheckingMode`: basic / strict
+- `Union[A, B]` = `A | B`
+- `from typing import Optional, Protocol`
+
+### 💎 核心区（必须内化）
+
+- **type hints 是弱约束，pyright 是强约束**
+- **Optional[str] = str | None（控制允许什么值）**
+- **= 默认值（控制是否必须传）**
+- **这两个是独立的，别混淆**
+
+------
+
+## 今日命令速查
+
+
+
+bash
+
+```bash
+# 安装
+uv add --dev pyright
+
+# 检查
+uv run pyright src
+
+# 预期输出
+0 errors, 0 warnings, 0 informations
+```
+
+---
+
