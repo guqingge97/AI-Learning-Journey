@@ -6013,7 +6013,180 @@ Fixture + AAA 是所有测试的骨架，后面只是被测对象变复杂了。
 
 ---
 
-# 全栈宗师笔记：M1
+# M1-W3-D3：ruff 格式化与静态检查
+
+------
+
+## A. 头部
+
+**Phase**: M1-W3-D3 ｜ Python 工程基石 · 工程模板化
+ **今日核心目标**: 用 ruff 统一代码风格和检查代码问题，保证团队协作时 git diff 只显示真正的逻辑修改
+
+------
+
+## B. 正文
+
+### Why：不学会导致的工程死穴
+
+
+
+```
+场景：你只改了 1 行业务逻辑
+结果：git diff 显示改了 200 行
+
+原因：你的 IDE 格式化设置和同事不一样
+后果：Code Review 根本看不出你改了什么
+```
+
+**团队协作铁律**：代码风格必须统一，否则 git 历史变成垃圾场。
+
+------
+
+### What：第一性原理 + 类比
+
+**ruff 做两件事**：
+
+| 功能   | 类比 | 作用                 |
+| ------ | ---- | -------------------- |
+| check  | 体检 | 发现代码问题（病灶） |
+| format | 美容 | 统一代码风格（外表） |
+
+**check 和 format 的区别**：
+
+- check 发现的是**错误**（未使用的 import、未定义的变量）
+- format 处理的是**风格**（空格、缩进、引号统一）
+
+------
+
+### How：最小可运行范式
+
+
+
+bash
+
+```bash
+# 1. 安装
+uv add --dev ruff
+
+# 2. 日常使用（三件套）
+uv run ruff check src          # 检查问题
+uv run ruff check src --fix    # 自动修复
+uv run ruff format src         # 格式化
+
+# 3. CI 中使用（只检查不修改）
+uv run ruff check src
+uv run ruff format src --check
+```
+
+**pyproject.toml 最小配置**：
+
+
+
+toml
+
+~~~toml
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+```
+
+---
+
+### Pitfall：真实踩坑
+
+**坑 1：E501 行太长，ruff 不自动修复**
+```
+原因：ruff 不知道怎么拆分你的长注释才合理
+解法：手动拆分，或考虑注释是否真的需要这么长
+```
+
+**坑 2：以为 format 能修复 check 发现的问题**
+```
+错误理解：ruff format 能删掉未使用的 import
+正确理解：format 只管风格，check --fix 才能删 import
+```
+
+**坑 3：忘记配置 src 目录**
+```
+症状：ruff 把 tests 目录也当源码检查，规则对不上
+解法：pyproject.toml 里配置 src = ["src"]
+```
+
+---
+
+### Application：在 RAG/Agent/架构中的位置
+```
+开发流程中的位置：
+
+  写代码 → ruff format → ruff check → pytest → git commit → CI 验证
+              ↑            ↑                        ↑
+           格式化       检查问题               再次验证（干净环境）
+```
+
+**与 D5 CI 的关系**：
+- D5 会在 GitHub Actions 里配置自动运行 `ruff check`
+- 本地跑一遍，CI 再跑一遍，双重保险
+
+---
+
+## C. 视觉闭环
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ruff 工作流                           │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│   写代码                                                 │
+│      ↓                                                  │
+│   ruff format src          → 统一风格                    │
+│      ↓                                                  │
+│   ruff check src           → 发现问题                    │
+│      ↓                                                  │
+│   ┌─ 有 [*] 标记？                                       │
+│   │    ↓ Yes                                            │
+│   │   ruff check src --fix → 自动修复                    │
+│   │    ↓                                                │
+│   └─ 还有问题？                                          │
+│        ↓ Yes                                            │
+│       手动修复（如 E501 行太长）                           │
+│        ↓                                                │
+│   All checks passed! ✅                                  │
+│        ↓                                                │
+│   git commit                                            │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## D. 工程师记忆分层
+
+### 💎 核心区（必须内化）
+```
+1. ruff check = 找问题，ruff format = 统一风格
+2. --fix 自动修复，--check 只检查不改
+3. 团队必须用同一套规则，否则 git diff 成垃圾
+```
+
+### 🔍 索引区（记关键词）
+```
+- E = 代码风格错误（如 E501）
+- F = 逻辑错误（如 F401 未使用 import）
+- I = import 排序
+- [*] = 可自动修复
+- pyproject.toml [tool.ruff] 配置
+```
+
+### 🗑️ 垃圾区（查文档）
+```
+- 所有错误码的含义 → ruff 官方文档
+- select 可选的规则列表 → 用到时再查
+- 其他高级配置（ignore、per-file 规则）→ 需要时再学
+~~~
+
+# M1-W3-D4
 
 ## Phase
 
