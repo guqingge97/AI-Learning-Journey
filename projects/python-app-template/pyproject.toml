@@ -19,6 +19,7 @@ build-backend = "hatchling.build"
 dev = [
     "pyright>=1.1.408",
     "pytest>=9.0.2",
+    "ruff>=0.14.14",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,3 +30,10 @@ packages = ["src/python_app_template"]
 include = ["src"]
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

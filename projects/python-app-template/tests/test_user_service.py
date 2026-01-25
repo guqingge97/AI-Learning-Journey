@@ -6,6 +6,8 @@
 import pytest
 from python_app_template.client import MockUserClient
 from python_app_template.service import UserService
+import os
+import json
 
 @pytest.fixture()
 def mock_client():

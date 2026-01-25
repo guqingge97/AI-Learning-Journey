@@ -1,9 +1,5 @@
-from .UserClient import UserClient
 from .MockUserClient import MockUserClient
 from .RealUserClient import RealUserClient
+from .UserClient import UserClient
 
-__all__ = [
-    "UserClient",
-    "MockUserClient",
-    "RealUserClient"
-]
+__all__ = ["UserClient", "MockUserClient", "RealUserClient"]
