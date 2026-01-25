@@ -6013,9 +6013,11 @@ Fixture + AAA 是所有测试的骨架，后面只是被测对象变复杂了。
 
 ---
 
-# M1-W3-D3：ruff 格式化与静态检查
+好，重新输出：
 
 ------
+
+# M1-W3-D3
 
 ## A. 头部
 
@@ -6028,15 +6030,11 @@ Fixture + AAA 是所有测试的骨架，后面只是被测对象变复杂了。
 
 ### Why：不学会导致的工程死穴
 
-
-
-```
-场景：你只改了 1 行业务逻辑
-结果：git diff 显示改了 200 行
+场景：你只改了 1 行业务逻辑，git diff 却显示改了 200 行
 
 原因：你的 IDE 格式化设置和同事不一样
+
 后果：Code Review 根本看不出你改了什么
-```
 
 **团队协作铁律**：代码风格必须统一，否则 git 历史变成垃圾场。
 
@@ -6060,20 +6058,35 @@ Fixture + AAA 是所有测试的骨架，后面只是被测对象变复杂了。
 
 ### How：最小可运行范式
 
+**安装**：
+
 
 
 bash
 
 ```bash
-# 1. 安装
 uv add --dev ruff
+```
 
-# 2. 日常使用（三件套）
+**日常使用（三件套）**：
+
+
+
+bash
+
+```bash
 uv run ruff check src          # 检查问题
 uv run ruff check src --fix    # 自动修复
 uv run ruff format src         # 格式化
+```
 
-# 3. CI 中使用（只检查不修改）
+**CI 中使用（只检查不修改）**：
+
+
+
+bash
+
+```bash
 uv run ruff check src
 uv run ruff format src --check
 ```
@@ -6098,33 +6111,22 @@ select = ["E", "F", "I"]
 ### Pitfall：真实踩坑
 
 **坑 1：E501 行太长，ruff 不自动修复**
-```
-原因：ruff 不知道怎么拆分你的长注释才合理
-解法：手动拆分，或考虑注释是否真的需要这么长
-```
+- 原因：ruff 不知道怎么拆分你的长注释才合理
+- 解法：手动拆分，或考虑注释是否真的需要这么长
 
 **坑 2：以为 format 能修复 check 发现的问题**
-```
-错误理解：ruff format 能删掉未使用的 import
-正确理解：format 只管风格，check --fix 才能删 import
-```
+- 错误理解：ruff format 能删掉未使用的 import
+- 正确理解：format 只管风格，check --fix 才能删 import
 
 **坑 3：忘记配置 src 目录**
-```
-症状：ruff 把 tests 目录也当源码检查，规则对不上
-解法：pyproject.toml 里配置 src = ["src"]
-```
+- 症状：ruff 把 tests 目录也当源码检查，规则对不上
+- 解法：pyproject.toml 里配置 `src = ["src"]`
 
 ---
 
 ### Application：在 RAG/Agent/架构中的位置
-```
-开发流程中的位置：
 
-  写代码 → ruff format → ruff check → pytest → git commit → CI 验证
-              ↑            ↑                        ↑
-           格式化       检查问题               再次验证（干净环境）
-```
+开发流程中的位置：写代码 → ruff format → ruff check → pytest → git commit → CI 验证
 
 **与 D5 CI 的关系**：
 - D5 会在 GitHub Actions 里配置自动运行 `ruff check`
@@ -6134,57 +6136,56 @@ select = ["E", "F", "I"]
 
 ## C. 视觉闭环
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    ruff 工作流                           │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│   写代码                                                 │
-│      ↓                                                  │
-│   ruff format src          → 统一风格                    │
-│      ↓                                                  │
-│   ruff check src           → 发现问题                    │
-│      ↓                                                  │
-│   ┌─ 有 [*] 标记？                                       │
-│   │    ↓ Yes                                            │
-│   │   ruff check src --fix → 自动修复                    │
-│   │    ↓                                                │
-│   └─ 还有问题？                                          │
-│        ↓ Yes                                            │
-│       手动修复（如 E501 行太长）                           │
-│        ↓                                                │
-│   All checks passed! ✅                                  │
-│        ↓                                                │
-│   git commit                                            │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+┌─────────────────────────────────────────────────────────────┐
+│                    ruff 工作流                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   写代码                                                     │
+│      ↓                                                      │
+│   ruff format src          → 统一风格                        │
+│      ↓                                                      │
+│   ruff check src           → 发现问题                        │
+│      ↓                                                      │
+│   有 [*] 标记？                                              │
+│      ↓ Yes                                                  │
+│   ruff check src --fix     → 自动修复                        │
+│      ↓                                                      │
+│   还有问题？                                                 │
+│      ↓ Yes                                                  │
+│   手动修复（如 E501 行太长）                                  │
+│      ↓                                                      │
+│   All checks passed! ✅                                      │
+│      ↓                                                      │
+│   git commit                                                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+~~~
 
----
+------
 
 ## D. 工程师记忆分层
 
-### 💎 核心区（必须内化）
-```
+**💎 核心区（必须内化）**
+
 1. ruff check = 找问题，ruff format = 统一风格
 2. --fix 自动修复，--check 只检查不改
 3. 团队必须用同一套规则，否则 git diff 成垃圾
-```
 
-### 🔍 索引区（记关键词）
-```
+**🔍 索引区（记关键词）**
+
 - E = 代码风格错误（如 E501）
 - F = 逻辑错误（如 F401 未使用 import）
 - I = import 排序
 - [*] = 可自动修复
-- pyproject.toml [tool.ruff] 配置
-```
+- pyproject.toml `[tool.ruff]` 配置
 
-### 🗑️ 垃圾区（查文档）
-```
+**🗑️ 垃圾区（查文档）**
+
 - 所有错误码的含义 → ruff 官方文档
 - select 可选的规则列表 → 用到时再查
 - 其他高级配置（ignore、per-file 规则）→ 需要时再学
-~~~
+
+---
 
 # M1-W3-D4
 
@@ -6399,6 +6400,145 @@ uv run pyright src
 # 预期输出
 0 errors, 0 warnings, 0 informations
 ```
+
+---
+
+# M1-W3-D5
+
+## A. 头部
+
+**Phase**: M1-W3-D5 ｜ Python 工程基石 · 工程模板化
+ **今日核心目标**: 配置 GitHub Actions，让每次 push 自动运行测试和检查，在干净环境验证代码质量
+
+------
+
+## B. 正文
+
+### Why：不学会导致的工程死穴
+
+场景 1：你改了代码，忘记跑测试就提交了 → 同事拉代码，跑不起来
+
+场景 2：你本地测试通过，但你本地装了某个库服务器没有 → 部署失败
+
+**CI 的价值**：在"干净的机器"上自动验证，不依赖你记得跑测试，不依赖你本地的环境，有问题立刻知道。
+
+------
+
+### What：第一性原理 + 类比
+
+**CI（持续集成）的本质**：每次提交 → 自动启动一台全新虚拟机 → 按配置运行检查 → 报告结果
+
+| 概念      | 类比             |
+| --------- | ---------------- |
+| CI        | 自动化质检流水线 |
+| 虚拟机    | 一台全新的电脑   |
+| ci.yml    | 质检操作手册     |
+| 绿勾/红叉 | 质检合格/不合格  |
+
+------
+
+### How：最小可运行范式
+
+**CI 虚拟机执行的 5 个步骤**：
+
+1. 拉取代码 → `actions/checkout@v4`
+2. 安装 uv → `astral-sh/setup-uv@v4`
+3. 安装依赖 → `uv sync`
+4. 运行检查 → `uv run ruff check src`
+5. 运行测试 → `uv run pytest tests`
+
+**项目在子目录时**，必须加 `working-directory`：
+
+
+
+yaml
+
+~~~yaml
+defaults:
+  run:
+    working-directory: projects/python-app-template
+```
+
+---
+
+### Pitfall：真实踩坑
+
+**坑 1：.github 文件夹放错位置**
+- 错误：放在项目子目录里
+- 正确：放在 Git 仓库根目录
+
+**坑 2：CI 报错找不到 pyproject.toml**
+- 原因：CI 默认在仓库根目录运行命令
+- 解法：用 working-directory 指定项目目录
+
+**坑 3：Actions 页面看不到运行记录**
+- 原因：ci.yml 没有正确推送到 GitHub
+- 解法：git status 检查是否提交，git push 确保推送
+
+---
+
+### Application：在 RAG/Agent/架构中的位置
+
+本地开发流程：写代码 → ruff format/check → pytest → git push
+
+远程验证流程：GitHub Actions 触发 → 启动虚拟机 → 拉代码 → 装依赖 → 跑检查 → 跑测试 → ✅ 绿勾 或 ❌ 红叉
+
+**双重保险**：本地跑一遍，CI 再跑一遍
+
+---
+
+## C. 视觉闭环
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CI 工作流                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   git push                                                  │
+│      ↓                                                      │
+│   GitHub 检测到 push                                         │
+│      ↓                                                      │
+│   读取 .github/workflows/ci.yml                              │
+│      ↓                                                      │
+│   启动 ubuntu-latest 虚拟机                                  │
+│      ↓                                                      │
+│   ┌─────────────────────────────────────┐                   │
+│   │ actions/checkout@v4    拉取代码      │                   │
+│   │ astral-sh/setup-uv@v4  安装 uv       │                   │
+│   │ uv sync                安装依赖      │                   │
+│   │ uv run ruff check src  代码检查      │                   │
+│   │ uv run pytest tests    运行测试      │                   │
+│   └─────────────────────────────────────┘                   │
+│      ↓                                                      │
+│   全部通过 → ✅ 绿勾                                          │
+│   任一失败 → ❌ 红叉                                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+~~~
+
+------
+
+## D. 工程师记忆分层
+
+**💎 核心区（必须内化）**
+
+1. CI = 在干净环境自动验证代码质量
+2. 配置文件放仓库根目录：`.github/workflows/ci.yml`
+3. 项目在子目录时，必须用 `working-directory`
+
+**🔍 索引区（记关键词）**
+
+- `on: [push]` → 触发条件
+- `runs-on: ubuntu-latest` → 运行环境
+- `uses` → 使用别人的 action
+- `run` → 执行 shell 命令
+- `actions/checkout@v4` → 拉代码
+- `astral-sh/setup-uv@v4` → 装 uv
+
+**🗑️ 垃圾区（查文档）**
+
+- 其他触发条件（pull_request、schedule）→ 用到时查
+- 矩阵测试（多 Python 版本）→ 进阶需求再学
+- secrets 配置 → 涉及 API Key 时再学
 
 ---
 
