@@ -131,3 +131,62 @@ pyrightconfig.json
 
 ---
 
+## M1-W3-WE1【速查表-README 标准结构】
+
+### README 标准结构
+
+
+
+markdown
+
+```markdown
+# 项目名称
+一句话说明
+
+## 环境要求
+- Python >= x.x
+- 依赖工具
+
+## 快速开始
+1. 克隆项目
+2. 安装依赖：`uv sync`
+3. 验证环境：`uv run pytest`
+
+## 开发命令
+| 命令 | 作用 |
+|------|------|
+| uv run ruff check src | 检查代码 |
+| uv run ruff format src | 格式化代码 |
+| uv run pyright | 类型检查 |
+| uv run pytest | 运行测试 |
+```
+
+### 提交 Git vs 不提交
+
+| 提交               | 不提交         |
+| ------------------ | -------------- |
+| src/、tests/       | .venv/         |
+| pyproject.toml     | __pycache__/   |
+| uv.lock            | .pytest_cache/ |
+| pyrightconfig.json | .ruff_cache/   |
+| .gitignore         | .idea/         |
+| .python-version    |                |
+| README.md          |                |
+| .github/workflows/ |                |
+
+### .gitignore 最小模板
+
+
+
+```
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+```
+
+---
+
