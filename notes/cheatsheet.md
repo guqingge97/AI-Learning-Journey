@@ -190,3 +190,69 @@ __pycache__/
 
 ---
 
+## M1-W4-D1【速查表-命令行三种参数类型】
+
+### 命令行三种参数类型
+
+| 类型     | 命令行示例   | typer 写法           | 判断依据           |
+| -------- | ------------ | -------------------- | ------------------ |
+| 位置参数 | `./file.txt` | `file: str`          | 无默认值           |
+| 带值选项 | `--times 3`  | `times: int = 1`     | 有默认值 + 非 bool |
+| 开关选项 | `--loud`     | `loud: bool = False` | 有默认值 + bool    |
+
+### typer 最小模板
+
+
+
+python
+
+```python
+import typer
+
+app = typer.Typer()
+
+@app.command()
+def greet(name: str, times: int = 1, loud: bool = False):
+    """命令描述（会显示在 --help）"""
+    pass
+
+if __name__ == "__main__":
+    app()
+```
+
+### 多子命令
+
+
+
+python
+
+```python
+@app.command()
+def count():
+    """统计文件"""
+    ...
+
+@app.command()
+def find():
+    """查找关键词"""
+    ...
+```
+
+### 常用命令
+
+
+
+bash
+
+```bash
+uv add typer                           # 安装 typer
+uv run python -m cli_tool.main --help  # 查看帮助
+uv run python -m cli_tool.main count --help  # 查看子命令帮助
+```
+
+### 命名转换规则
+
+| 函数参数名    | 命令行选项名    |
+| ------------- | --------------- |
+| `dry_run`     | `--dry-run`     |
+| `output_file` | `--output-file` |

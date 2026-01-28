@@ -5749,7 +5749,8 @@ bash
 
 ```bash
 # 创建项目
-uv init python-app-template
+uv init python-app-template     # flat 布局（代码在根目录）
+uv init --lib string-utils  # src 布局（代码在 src/ 下）  用这个
 cd python-app-template
 
 # 添加依赖（自动记录）
@@ -6676,7 +6677,138 @@ python-app-template/
 
 ---
 
+# M1-W4-D1 
 
+## Phase
+
+Month 1 Week 4 - 综合项目（CLI 工具）
+
+## 今日核心目标
+
+掌握 CLI 框架选型与命令结构设计，让用户能通过命令行与程序交互。
+
+------
+
+## Why：不学会导致的工程死穴
+
+- 自己用 `sys.argv` 解析参数 → 重复造轮子，边界处理漏洞百出
+- 没有统一的命令结构 → 用户不知道怎么用，`--help` 输出混乱
+- 参数类型不校验 → 用户输入 `--times abc`，程序直接崩溃
+- 后续做 LLM CLI 工具（调用模型、管理 prompt）时，没有规范的交互方式
+
+------
+
+## What：第一性原理
+
+**CLI 本质是"用户意图的结构化表达"**
+
+- 用户想做什么 → 程序名 + 子命令
+- 怎么做 → 选项（可选配置）
+- 对谁做 → 位置参数（必填目标）
+
+**typer 的核心洞察：函数签名 = 命令定义**
+
+- 参数名 → 选项名/参数名
+- 类型注解 → 自动校验 + 帮助信息
+- 默认值 → 决定必填/可选
+- docstring → 命令描述
+
+------
+
+## How：最小可运行范式
+
+
+
+python
+
+~~~python
+import typer
+
+app = typer.Typer()
+
+@app.command()
+def greet(name: str, times: int = 1, loud: bool = False):
+    """向某人打招呼"""
+    for _ in range(times):
+        msg = f"Hello, {name}!"
+        print(msg.upper() if loud else msg)
+
+if __name__ == "__main__":
+    app()
+```
+~~~
+
+**参数类型判断规则**：
+
+- 有默认值？
+  - 否 → 位置参数（必填）
+  - 是 → 类型是 bool？
+    - 是 → 开关选项（--flag / --no-flag）
+    - 否 → 带值选项（--option VALUE）
+
+---
+
+## Pitfall
+
+- **误以为参数位置决定类型**：实际是"有无默认值"决定，跟第几个参数无关
+- **bool 选项会自动生成反向开关**：`loud: bool = False` 生成 `--loud` 和 `--no-loud`
+- **下划线自动转连字符**：`dry_run` → `--dry-run`，命令行不能用下划线
+- **docstring 会变成帮助文档**：写清楚，用户能直接看到
+
+---
+
+## Application：在 RAG/Agent/架构中的位置
+
+- 模型调用调试：`cli chat "你好" --model gpt-4 --temperature 0.7`
+- RAG 管道操作：`cli ingest ./docs --chunk-size 500`
+- 评测脚本入口：`cli eval --dataset qa.json --output report.md`
+- Agent 任务触发：`cli agent run "帮我总结这个文件" --tools web,file`
+- 运维工具：`cli cache clear --older-than 7d`
+
+---
+
+## 视觉闭环
+```
+用户输入                        typer 解析                    函数执行
+───────────────────────────────────────────────────────────────────────
+
+cli-tool greet Alice            app()
+         --times 3              ├── 匹配子命令: greet
+         --loud                 ├── 解析参数:
+                                │   name="Alice" (位置)
+                                │   times=3 (选项)
+                                │   loud=True (开关)
+                                └── 调用 greet(name, times, loud)
+                                                │
+                                                ▼
+                                        HELLO, ALICE!
+                                        HELLO, ALICE!
+                                        HELLO, ALICE!
+```
+
+------
+
+## 工程师记忆分层
+
+**🗑️ 垃圾区（查文档）**
+
+- typer 的安装命令
+- `--install-completion` 等自动生成的选项
+- 具体的类型转换细节
+
+**🔍 索引区（记关键词）**
+
+- `typer.Typer()` + `@app.command()` 组合
+- 短选项写法（如 `-n` 对应 `--name`）
+- `typer.Option()` / `typer.Argument()` 高级定制
+
+**💎 核心区（必须内化）**
+
+- 参数类型由"有无默认值 + 是否 bool"决定，不是位置
+- 函数签名 = 命令定义（声明式思想）
+- 多子命令 = 多个 `@app.command()` 装饰的函数
+
+---
 
 
 
