@@ -6810,7 +6810,165 @@ cli-tool greet Alice            app()
 
 ---
 
+# M1-W4-D2
 
+## Phase
+
+Month 1 Week 4 - CLI 综合项目（IO 处理 + 错误处理）
+
+## 今日核心目标
+
+让 CLI 命令真正能读写文件，并优雅处理各种错误情况。
+
+------
+
+## Why：不学会导致的工程死穴
+
+- 不用 `with` → 异常时资源泄露，文件句柄耗尽
+- 不处理异常 → 用户看到 Python 堆栈，一脸懵逼
+- 不用非零退出码 → 脚本/CI 无法判断命令是否成功
+- 异常顺序写反 → 父类"吃掉"子类，精确错误信息丢失
+
+------
+
+## What：第一性原理 + 类比
+
+**文件操作的本质**：向操作系统借资源（文件句柄），用完必须还。
+
+**Java 类比**：
+
+| Python                     | Java                    |
+| -------------------------- | ----------------------- |
+| `with open()`              | try-with-resources      |
+| `OSError`                  | `IOException`           |
+| `FileNotFoundError`        | `FileNotFoundException` |
+| `raise typer.Exit(code=1)` | `System.exit(1)`        |
+
+**CLI 错误处理原则**：对机器用退出码，对人用友好信息。
+
+------
+
+## How：最小可运行范式
+
+### 文件读取 + 异常处理
+
+
+
+python
+
+```python
+import typer
+
+@app.command()
+def count(file: str):
+    try:
+        with open(file, "r") as f:
+            print(len(f.read().split()))
+    except FileNotFoundError:
+        typer.echo(f"Error: 文件 '{file}' 不存在", err=True)
+        raise typer.Exit(code=1)
+    except PermissionError:
+        typer.echo(f"Error: 没有权限读取 '{file}'", err=True)
+        raise typer.Exit(code=1)
+    except OSError as e:
+        typer.echo(f"Error: 读取失败 - {e}", err=True)
+        raise typer.Exit(code=1)
+```
+
+### 可选输出文件
+
+
+
+python
+
+~~~python
+from typing import Optional
+
+@app.command()
+def replace(source: str, target: str, file: str, output: Optional[str] = None):
+    try:
+        if output:
+            with open(file, "r") as f1, open(output, "w") as f2:
+                f2.write(f1.read().replace(source, target))
+        else:
+            with open(file, "r") as f:
+                print(f.read().replace(source, target))
+    except FileNotFoundError:
+        typer.echo(f"Error: 文件不存在", err=True)
+        raise typer.Exit(code=1)
+```
+
+---
+
+## Pitfall：真实踩坑
+
+- **异常顺序写反**：`except OSError` 放最前面会"吞掉"所有子类异常，`FileNotFoundError` 的精确提示永远不会触发
+- **错误信息不精确**：读和写都可能抛 `FileNotFoundError`，笼统说"文件不存在"用户不知道是输入还是输出的问题
+- **忘记 `err=True`**：错误信息应该输出到 stderr，不是 stdout，否则管道处理时会混在正常输出里
+- **空字符串 vs None**：用 `""` 作为"未指定"的默认值语义不清晰，`Optional[str] = None` 更规范
+
+---
+
+## Application：在 RAG/Agent/架构中的位置
+```
+CLI 工具链路：
+┌─────────────────────────────────────────────────┐
+│  用户输入                                        │
+│  cli_tool replace "old" "new" in.txt -o out.txt │
+└─────────────────┬───────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────┐
+│  typer 参数解析（缺参数自动提示）                 │
+└─────────────────┬───────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────┐
+│  文件读取（with + try/except）  ← 今天重点       │
+│  - FileNotFoundError                            │
+│  - PermissionError                              │
+│  - OSError 兜底                                 │
+└─────────────────┬───────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────┐
+│  业务处理（替换/统计/查找）                      │
+└─────────────────┬───────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────┐
+│  输出（终端 or 文件）                            │
+└─────────────────┬───────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────┐
+│  退出码（0=成功，非0=失败）                      │
+└─────────────────────────────────────────────────┘
+~~~
+
+**未来应用**：
+
+- RAG 系统需要读取文档文件、配置文件
+- Agent 执行工具时需要处理各种 IO 错误
+- 生产服务的错误码设计思路相同
+
+------
+
+## 工程师记忆分层
+
+**🗑️ 垃圾区（查文档）**
+
+- 各种 OSError 子类的完整列表
+- `open()` 的所有模式参数（r/w/a/b/+）
+
+**🔍 索引区（记关键词）**
+
+- `typer.echo(err=True)` 输出到 stderr
+- `Optional[str] = None` 可选参数写法
+- 多文件可以 `with open() as f1, open() as f2`
+
+**💎 核心区（必须内化）**
+
+- `with open()` 自动关闭，异常也能关
+- 异常捕获顺序：子类在前，父类兜底
+- CLI 错误 = 友好信息 + 非零退出码
+
+---
 
 
 

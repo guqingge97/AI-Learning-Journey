@@ -256,3 +256,66 @@ uv run python -m cli_tool.main count --help  # 查看子命令帮助
 | ------------- | --------------- |
 | `dry_run`     | `--dry-run`     |
 | `output_file` | `--output-file` |
+
+---
+
+## M1-W4-D2【速查表-文件读写】
+
+### 文件读写
+
+
+
+python
+
+```python
+# 正确姿势（自动关闭）
+with open("file.txt", "r") as f:
+    content = f.read()
+
+# 多文件同时打开
+with open("in.txt", "r") as f1, open("out.txt", "w") as f2:
+    f2.write(f1.read())
+```
+
+### typer 错误退出
+
+
+
+python
+
+```python
+typer.echo("Error: 描述", err=True)  # 输出到 stderr
+raise typer.Exit(code=1)              # 非零退出码
+```
+
+### 异常处理顺序（子类在前）
+
+
+
+python
+
+```python
+except FileNotFoundError:   # 最具体
+    ...
+except PermissionError:     # 具体
+    ...
+except OSError as e:        # 兜底
+    ...
+```
+
+### 可选参数
+
+
+
+python
+
+```python
+from typing import Optional
+
+def cmd(output: Optional[str] = None):
+    if output:  # 检查是否指定
+        ...
+```
+
+---
+
