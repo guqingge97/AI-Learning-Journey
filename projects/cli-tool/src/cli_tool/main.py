@@ -3,9 +3,12 @@
 @Time : 2026/1/28 22:20
 @Description: 
 """
-from typing import Optional
-
+from typing import Optional, List
+import time
 import typer
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 
 app = typer.Typer()
 
@@ -18,28 +21,36 @@ def greet(name: str, times: int = 1, loud: bool = False):
             print(f"Hello, {name}")
 
 
-
-
 @app.command()
-def count(file: str, count_lines: bool = False):
-    """统计文件字数/行数"""
+def count(files: List[str], count_lines: bool = False):
+    # 1. 用 partial 固定 count_lines 参数
+    task = partial(count_one, count_lines=count_lines)
+
+    # 2. 用线程池并发执行
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = executor.map(task, files)
+
+    # 3. 打印结果
+    for result in results:
+        print(result)
+
+
+
+def count_one(file: str, count_lines: bool) -> str:
     try:
         with open(file, "r") as f:
-            # 真正的业务逻辑放这里
+            content = f.read()
+            time.sleep(1)  # 模拟耗时操作
             if count_lines:
-                print(len(f.readlines()))
+                return f"{file}: {len(content.splitlines())}"
             else:
-                print(len(f.read().split()))
+                return f"{file}: {len(content)}"
     except FileNotFoundError:
-        typer.echo(f"Error: 文件 '{file}' 不存在", err=True)
-        raise typer.Exit(code=1)
+        return f"{file}: ERROR - 文件不存在"
     except PermissionError:
-        typer.echo(f"Error: 没有权限读取 '{file}'", err=True)
-        raise typer.Exit(code=1)
+        return f"{file}: ERROR - 权限不足"
     except OSError as e:
-        typer.echo(f"Error: 读取文件失败 - {e}", err=True)
-        raise typer.Exit(code=1)
-
+        return f"{file}: ERROR - {e}"
 
 
 @app.command()

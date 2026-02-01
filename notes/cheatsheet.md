@@ -319,3 +319,73 @@ def cmd(output: Optional[str] = None):
 
 ---
 
+------
+
+## M1-W4-D3【速查表-本节知识】
+
+### ThreadPoolExecutor 最小用法
+
+
+
+python
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = executor.map(func, iterable)
+```
+
+### 多参数函数处理
+
+
+
+python
+
+~~~python
+from functools import partial
+
+# 固定部分参数
+task = partial(count_one, count_lines=count_lines)
+results = executor.map(task, files)
+```
+
+### 耗时计算（批次思维）
+```
+总时间 = ceil(任务数 / worker数) × 单任务耗时
+
+例：10 个任务，4 个 worker，每个 1 秒
+→ ceil(10/4) = 3 批 = 3 秒
+~~~
+
+### 批量处理错误处理原则
+
+
+
+python
+
+```python
+# ✅ try-except 在循环内部，单个失败不影响其他
+for file in files:
+    try:
+        process(file)
+    except Exception:
+        print(error)  # 不 raise，继续下一个
+
+# ❌ try-except 在循环外部，一个失败全部停止
+try:
+    for file in files:
+        process(file)
+except Exception:
+    ...
+```
+
+### 选型口诀
+
+| 场景            | 工具               |
+| --------------- | ------------------ |
+| 文件 IO（阻塞） | ThreadPoolExecutor |
+| 网络 IO（HTTP） | async / asyncio    |
+
+---
+
