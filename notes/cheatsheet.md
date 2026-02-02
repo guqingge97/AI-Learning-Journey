@@ -389,3 +389,60 @@ except Exception:
 
 ---
 
+## M1-W4-D4【速查表-本节知识】
+
+### 测试场景分类
+
+| 类型 | 含义                         | 典型例子                 |
+| ---- | ---------------------------- | ------------------------ |
+| 正常 | Happy path，预期使用方式     | 文件存在，返回正确结果   |
+| 异常 | Error path，应优雅处理的错误 | 文件不存在，返回错误提示 |
+| 边界 | Edge case，极端但合法的输入  | 空文件，返回 0           |
+
+### CLI 测试基本结构
+
+
+
+python
+
+```python
+from typer.testing import CliRunner
+from cli_tool.main import app
+
+runner = CliRunner()
+
+def test_xxx(tmp_path):
+    # 1. 准备测试文件
+    f = tmp_path / "test.txt"
+    f.write_text("content")
+    
+    # 2. 调用命令
+    result = runner.invoke(app, ["命令", "参数", str(f)])
+    
+    # 3. 断言结果
+    assert result.exit_code == 0
+    assert "预期输出" in result.stdout
+```
+
+### 常用断言
+
+| 断言                     | 用途             |
+| ------------------------ | ---------------- |
+| `result.exit_code == 0`  | 命令执行成功     |
+| `result.exit_code == 1`  | 命令执行失败     |
+| `"xxx" in result.stdout` | 输出包含预期内容 |
+
+### 添加 pytest 依赖
+
+
+
+bash
+
+```bash
+uv add pytest --dev
+uv pip install -e .
+uv run pytest -v
+```
+
+---
+
