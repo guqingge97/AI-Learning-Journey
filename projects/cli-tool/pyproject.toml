@@ -19,3 +19,6 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.0.2",
 ]
+
+[project.scripts]
+cli-tool = "cli_tool.main:app"

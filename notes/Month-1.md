@@ -7380,3 +7380,156 @@ uv run pytest -v
 
 ---
 
+# M1-W4-D5 
+
+## A. 头部
+
+**Phase**：Month 1 - Python 工程基石 / Week 4 - 综合项目 / Day 5
+
+**今日核心目标**：让项目从"自己能跑"变成"别人也能跑"
+
+------
+
+## B. 正文
+
+### Why：不学会导致的工程死穴
+
+你写的项目，只有你自己能跑：
+
+- 面试官 clone 作品集，3 分钟跑不起来直接关掉
+- 同事接手你的代码，问你 20 个问题才能跑通
+- 3 个月后你自己都忘了怎么启动
+
+这不是"写文档的能力"问题，是**工程师的基本职业素养**。
+
+------
+
+### What：第一性原理
+
+**入口点的本质**：
+
+Python 代码本身只是函数，不是命令。`[project.scripts]` 是一个"翻译层"：
+
+
+
+```
+用户输入命令 → 操作系统找可执行文件 → 可执行文件调用 Python 函数
+     ↑                                           ↑
+ cli-tool                              cli_tool.main:app
+```
+
+没有这个翻译层，用户只能写 `python -c "from cli_tool.main import app; app()"`
+
+**README 的本质**：
+
+README 是项目的"用户界面"——代码的用户不是最终用户，而是**其他开发者**（包括未来的你）。
+
+------
+
+### How：最小可运行范式
+
+**入口点配置**：
+
+
+
+toml
+
+```toml
+[project.scripts]
+cli-tool = "cli_tool.main:app"
+```
+
+格式解读：`命令名 = "包名.模块名:入口函数"`
+
+**README 骨架**：
+
+
+
+markdown
+
+~~~markdown
+# 项目名
+一句话描述
+
+## 环境要求
+- Python >= x.xx
+- uv
+
+## 快速开始
+1. pip install uv
+2. uv sync
+3. uv run xxx --help（验证命令 + 预期输出）
+
+## 命令用法
+| 命令 | 作用 | 示例 |
+```
+
+---
+~~~
+
+### Pitfall：真实踩坑
+
+- **路径写错**：写成 `src.cli_tool.main:app`，但安装后 import 路径是 `cli_tool.main`，不带 `src`
+- **入口函数指错**：指向 `greet` 只能用一个命令，应该指向 `app`（typer 主对象）
+- **忘了 uv sync**：改完 pyproject.toml 不重新安装，命令不会更新
+- **command not found**：命令装在虚拟环境里，需要 `uv run cli-tool` 或先激活环境
+
+---
+
+### Application：在 RAG/Agent/架构中的位置
+
+- Month 2 的 `llm-client`、`tools-demo` 都需要入口点配置
+- Month 4 的 `rag-portfolio` 作品集，README 决定面试官是否愿意看
+- 生产项目交接时，README 是第一道门槛
+
+---
+
+## C. 视觉闭环
+```
+实习生拿到项目
+      │
+      ▼
+┌─────────────────────────────────────────────┐
+│  README.md                                  │
+│  ┌─────────────────────────────────────┐    │
+│  │ 1. pip install uv                   │    │
+│  │ 2. uv sync                          │    │
+│  │ 3. uv run cli-tool --help           │    │
+│  │    预期：看到 4 个命令              │    │
+│  └─────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
+      │
+      ▼
+pyproject.toml
+[project.scripts]
+cli-tool = "cli_tool.main:app"
+      │
+      ▼
+uv sync → 创建可执行命令
+      │
+      ▼
+uv run cli-tool --help → ✅ 验证成功
+```
+
+------
+
+## D. 工程师记忆分层
+
+🗑️ **垃圾区（查文档）**
+
+- README 的 Markdown 语法细节
+- 表格怎么对齐
+
+🔍 **索引区（记关键词）**
+
+- `[project.scripts]` —— 入口点配置
+- "3 步可跑" —— README 验收标准
+
+💎 **核心区（必须内化）**
+
+- 入口点格式：`命令名 = "包名.模块名:入口函数"`
+- README 必须包含：环境要求 + 安装步骤 + **验证命令及预期输出**
+- 改完 pyproject.toml 要 `uv sync`
+
+---
+

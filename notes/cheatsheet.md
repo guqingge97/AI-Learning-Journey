@@ -446,3 +446,78 @@ uv run pytest -v
 
 ---
 
+## M1-W4-D5【速查表-入口点配置】
+
+### 入口点配置
+
+**pyproject.toml 配置格式**：
+
+
+
+toml
+
+```toml
+[project.scripts]
+命令名 = "包名.模块名:入口函数"
+```
+
+**实际示例**：
+
+
+
+toml
+
+```toml
+[project.scripts]
+cli-tool = "cli_tool.main:app"
+```
+
+**配置后需要重新安装**：
+
+
+
+bash
+
+```bash
+uv sync
+```
+
+**运行命令**：
+
+
+
+bash
+
+```bash
+uv run cli-tool --help
+```
+
+------
+
+### README 必备结构
+
+| 部分        | 回答的问题               |
+| ----------- | ------------------------ |
+| 标题 + 描述 | 这是什么？               |
+| 环境要求    | 需要什么版本？           |
+| 快速开始    | 怎么装？怎么验证装对了？ |
+| 命令用法    | 怎么用？                 |
+
+------
+
+### 一键运行验证标准
+
+- 陌生机器 **3 步可跑**
+- 步骤：安装 uv → `uv sync` → `uv run cli-tool --help`
+- 必须给出**预期输出**，让用户知道"对了"
+
+------
+
+### 核心概念
+
+- `[project.scripts]`：把 Python 函数变成可执行命令
+- 没配置 → 命令不存在（command not found）
+- 配置后 → `uv sync` 自动创建命令
+
+---
+
