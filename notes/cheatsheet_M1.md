@@ -521,3 +521,82 @@ uv run cli-tool --help
 
 ---
 
+## M2-W5-D3【速查表-本节知识】
+
+**核心问题**：LLM 不保证只输出纯 JSON，需要容错解析
+
+------
+
+**结构化输出三种失败形式**
+
+- 包裹文本：JSON 前后有废话
+- 格式错误：单引号、多余逗号
+- 内容缺失：字段不全或类型不对
+
+------
+
+**提取 JSON：正则**
+
+
+
+python
+
+```python
+re.search(r'\{.*?\}', text, re.DOTALL)
+# .*?  非贪婪：找到第一个完整 {...} 就停
+# .*   贪婪：从第一个 { 吞到最后一个 }（错误）
+# re.DOTALL：让 . 能匹配换行符
+```
+
+------
+
+**容错解析完整链路**
+
+
+
+python
+
+```python
+def extract_json(text):
+    match = re.search(r'\{.*?\}', text, re.DOTALL)
+    return match.group() if match else None
+
+def parse_json(text):
+    raw = extract_json(text)
+    try:
+        return json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        return None
+```
+
+------
+
+**集成到 LLMClient**
+
+
+
+python
+
+```python
+content = parse_json(response.content) or response.content
+# 解析成功 → 返回字典
+# 解析失败 → fallback 原始字符串，不丢数据
+```
+
+------
+
+**放在 LLMClient 内部 vs 调用方**
+
+- 内部：所有调用方自动受益，不会漏调
+- 调用方：每次都要手动调，容易出错
+
+------
+
+**常见坑**
+
+- 正则里用了中文全角 `？` → 匹配不到任何内容
+- `try/except` 里忘了 `return` → 成功也返回 `None`
+- Mock 数据用单引号 `'` → `json.loads` 报错（JSON 只认双引号）
+
+---
+

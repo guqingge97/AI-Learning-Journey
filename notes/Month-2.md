@@ -331,3 +331,153 @@ RetryHandler.execute()
 
 ---
 
+# M2-W5-D3（结构化输出：JSON schema约束+解析容错）
+
+## A. 头部
+
+- **Phase**：Month 2 - LLM API 工程化 / Week 5 - LLMClient 基础封装
+- **今日核心目标**：当 LLM 输出不是纯 JSON 时，能稳定提取并解析，失败时优雅降级
+
+------
+
+## B. 正文
+
+### Why：不学会导致的工程死穴
+
+LLM 本质是文字接龙引擎，不是 JSON 生成器。即使 prompt 里写了"只返回 JSON"，它仍可能：
+
+- 在 JSON 前后加解释文字
+- 用单引号代替双引号
+- 字段名拼错、多逗号
+
+如果不做容错，`json.loads()` 一报错，整个请求链路就崩了。生产环境里这种问题每天都会发生。
+
+------
+
+### What：第一性原理 + 类比
+
+结构化输出失败有三种形式：
+
+- **包裹文本**：JSON 被自然语言包裹（最常见）
+- **格式错误**：单引号、多余逗号、缺字段
+- **内容缺失**：字段不全或类型不对
+
+类比：就像快递员把包裹塞在一个大纸箱里，外面还缠了胶带和废纸。你要先拆包装（extract），再检查货物是否完好（parse），坏了就记录问题（except），不能直接扔掉整个快递。
+
+------
+
+### How：最小可运行范式
+
+**第一步：提取——从文本里找 JSON**
+
+```python
+import re
+
+def extract_json(text: str) -> str | None:
+    match = re.search(r'\{.*?\}', text, re.DOTALL)
+    return match.group() if match else None
+```
+
+关键点：
+
+- `.*?` 非贪婪：找到第一个完整 `{...}` 就停，不会把两个 JSON 中间的文字也吞进去
+- `re.DOTALL`：让 `.` 能匹配换行符，处理多行 JSON
+
+**第二步：解析——提取后做容错 parse**
+
+```python
+import json
+
+def parse_json(text: str) -> dict | None:
+    raw = extract_json(text)
+    try:
+        return json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        return None
+```
+
+**第三步：集成到 LLMClient**
+
+```python
+content = parse_json(response.content) or response.content
+# 解析成功 → 返回字典
+# 解析失败（None）→ or fallback，返回原始字符串，不丢数据
+```
+
+------
+
+### Pitfall：真实踩坑
+
+- 正则里用了中文全角问号 `？` → 匹配失败，返回 None，排查半天找不到原因
+- `try/except` 里忘了 `return` → 解析成功也返回 None，数据默默丢失
+- Mock 数据用单引号 `'a': 1` → `json.loads` 报错，误以为 parse_json 有 bug，其实是测试数据不合法
+- `.*` 贪婪匹配 → 两个 JSON 之间的文字被吞进去，拿到一个无法解析的大字符串
+
+------
+
+### Application：在 RAG/Agent/架构中的位置
+
+```
+用户请求
+    ↓
+LLMClient.chat()
+    ↓
+Provider 返回原始文本
+    ↓
+parse_json()  ← 今天的位置
+    ↓
+返回字典（成功）或原始字符串（失败）
+    ↓
+调用方
+```
+
+在 RAG 里，LLM 生成带引用的结构化答案（如 `{"answer": "...", "sources": [...]}`），必须用今天的方法解析。Agent 里，LLM 决策下一步工具调用时返回的也是 JSON，解析失败会导致整个 Agent 卡死。
+
+------
+
+## C. 视觉闭环
+
+```
+LLM 原始输出
+"好的，分析结果：{\"intent\": \"查询\", \"city\": \"深圳\"} 希望有帮助"
+        │
+        ▼
+  extract_json()
+  re.search(r'\{.*?\}')
+        │
+        ├─ 找到 → "{\"intent\": \"查询\", \"city\": \"深圳\"}"
+        │
+        ▼
+   parse_json()
+   json.loads()
+        │
+        ├─ 成功 → {"intent": "查询", "city": "深圳"}  ✅
+        │
+        └─ 失败 → None → or → 原始字符串 fallback     ⚠️
+```
+
+------
+
+## D. 工程师记忆分层
+
+🗑️ **垃圾区（查文档）**
+
+- `re.DOTALL` 的具体数值
+- `json.JSONDecodeError` 的完整继承链
+- `re.search` vs `re.match` vs `re.findall` 的全部差异
+
+🔍 **索引区（记关键词）**
+
+- 提取 JSON 用正则 `\{.*?\}`，非贪婪
+- 解析失败用 `json.JSONDecodeError` 捕获
+- fallback 用 `or` 原始字符串
+
+💎 **核心区（必须内化）**
+
+- LLM 不保证输出纯 JSON，容错是工程必选项，不是可选项
+- 三种失败形式：包裹文本 / 格式错误 / 内容缺失
+- 解析逻辑放在 LLMClient 内部，调用方不应该关心这个细节（封装原则）
+- 失败时不能丢数据，要 fallback 到原始字符串
+
+---
+

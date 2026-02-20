@@ -20,7 +20,7 @@ from llm_client.exceptions import (
 retry_handler = RetryHandler(
     retryable_errors=(LLMTimeoutError, LLMRateLimitError, LLMServerError)
 )
-provider = FailingMockProvider()
+provider = MockProvider()
 client = LLMClient(provider=provider, retry_handler=retry_handler)
 
 response = client.chat(ChatRequest(messages=[{"role": "user", "content": "Hello, how are you?"}]))

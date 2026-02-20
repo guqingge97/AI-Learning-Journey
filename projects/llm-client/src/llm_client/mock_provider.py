@@ -10,7 +10,7 @@ from .exceptions import LLMError, LLMTimeoutError,LLMAuthError
 class MockProvider:
     def chat(self, request: ChatRequest) -> ChatResponse:
         return ChatResponse(
-            content="Hello, this is a mock response.",
+            content="Hello, this is a mock response. {\"intent\": \"查询天气\", \"city\": \"深圳\"}",
             input_tokens=len(request.messages),
             output_tokens=10,
         )
