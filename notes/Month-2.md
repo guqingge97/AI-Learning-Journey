@@ -481,3 +481,159 @@ LLM 原始输出
 
 ---
 
+# M2-W5-D4 
+
+**Phase**：Month 2 · Week 5 · Day 4 — LLM API 工程化
+ **今日核心目标**：实现 MockProvider，用单元测试验证 LLMClient 的核心行为
+
+------
+
+## Why：不学会导致的工程死穴
+
+没有 Mock，测试就必须真实调用 API：
+
+- **烧钱**：每次跑 CI/CD 都在消耗 API 额度，积少成多
+- **慢**：单次 1-3 秒，50 个测试就是 2 分钟，没人愿意频繁跑
+- **不稳定**：模型每次返回不同，`assert response == "xxx"` 永远无法成立
+
+结果是：要么不写测试，要么测试形同虚设。
+
+------
+
+## What：第一性原理 + 类比
+
+**MockProvider 本质**：一个实现了 `Provider` 接口的"演员"。
+
+它长得和真实 Provider 一模一样（同样的方法签名），但内部不调用任何网络，只是从预设列表里按顺序取字符串返回。
+
+类比：话剧排练时用道具刀代替真刀——导演（LLMClient）不需要知道是真的还是假的，排练照样进行。
+
+**为什么是实现 Provider 接口，而不是继承 LLMClient？**
+ LLMClient 是"调用方"，Provider 是"数据来源方"。Mock 的是数据来源，不是调用逻辑。这正是 D1 学的"组合优于继承"的实际应用。
+
+------
+
+## How：最小可运行范式
+
+### MockProvider
+
+```python
+class MockProvider:
+    def __init__(self, responses: list[str]):
+        self.responses = responses
+
+    def chat(self, request: ChatRequest) -> ChatResponse:
+        if not self.responses:
+            raise ValueError("MockProvider 的预设回答已用完")
+        return ChatResponse(
+            content=self.responses.pop(0),
+            input_tokens=len(request.messages),
+            output_tokens=10,
+        )
+```
+
+### 三类单元测试
+
+```python
+# 场景1：正常返回
+def test_normal_response():
+    mock = MockProvider(responses=["你好"])
+    client = LLMClient(provider=mock, retry_handler=retry_handler)
+    response = client.chat(ChatRequest(messages=[{"role": "user", "content": "Hi"}]))
+    assert response.content == "你好"
+
+# 场景2：多次调用顺序正确
+def test_multiple_responses():
+    mock = MockProvider(responses=["第一个", "第二个"])
+    client = LLMClient(provider=mock, retry_handler=retry_handler)
+    assert client.chat(...).content == "第一个"
+    assert client.chat(...).content == "第二个"
+
+# 场景3：预设用完抛异常
+def test_responses_exhausted():
+    with pytest.raises(ValueError):
+        mock = MockProvider(responses=["仅一个"])
+        client = LLMClient(provider=mock)
+        client.chat(...)  # 第一次成功
+        client.chat(...)  # 第二次触发 ValueError
+```
+
+------
+
+## Pitfall：真实踩坑
+
+- `pytest.raises` 的 `with` 块里，**异常之后的代码不会执行**。写在里面的 `assert` 如果放在触发异常的代码后面，永远不会跑到，属于无效断言，要删掉。
+
+- `src` 布局下 pytest 找不到模块，需要在 `pyproject.toml` 配置：
+
+  ```toml
+  [tool.pytest.ini_options]
+  pythonpath = ["src"]
+  ```
+
+  否则只能每次手动加 `PYTHONPATH=src` 前缀，容易忘。
+
+- `MockProvider` 的 `responses` 列表**不要在方法参数里传**，要在 `__init__` 里传。方法参数只接受 `ChatRequest`，否则破坏 Protocol 接口一致性，注入进 LLMClient 会报类型错误。
+
+------
+
+## Application：在 RAG/Agent/架构中的位置
+
+```
+测试层
+  └── test_llm_client.py
+        ├── MockProvider（假数据源）  ← 今天
+        └── LLMClient（被测对象）
+
+生产层
+  └── LLMClient
+        └── OpenAIProvider / DeepSeekProvider（真实数据源）
+```
+
+MockProvider 在 Month 3 RAG、Month 5 Agent 中同样适用：凡是依赖外部服务的模块，都可以用同样的模式注入 Mock，让整个测试体系脱离网络独立运行。
+
+------
+
+## 视觉闭环
+
+```
+测试阶段                    生产阶段
+──────────                  ──────────
+LLMClient                   LLMClient
+    │                           │
+    ▼                           ▼
+MockProvider               OpenAIProvider
+  (假数据，可控)              (真实API，不可控)
+  pop(0) 取预设值             HTTP 请求返回
+    │                           │
+    ▼                           ▼
+ChatResponse               ChatResponse
+  content="你好"             content="模型真实回复"
+
+两者对 LLMClient 完全透明 → 组合优于继承的价值
+```
+
+------
+
+## 工程师记忆分层
+
+🗑️ 垃圾区（查文档）
+
+- `pytest.raises` 的具体语法
+- `pyproject.toml` 的配置字段名
+- `pop(0)` 还是 `pop(-1)`
+
+🔍 索引区（记关键词）
+
+- Mock = 实现 Provider 接口的假数据源
+- src 布局 → pythonpath 配置
+- pytest 三段式：准备 / 执行 / 断言
+
+💎 核心区（必须内化）
+
+- **为什么需要 Mock**：省钱 + 够快 + 确定性，缺一不可
+- **Mock 在哪一层**：替换 Provider，不替换 LLMClient，体现"组合优于继承"
+- **pytest.raises 的语义**：不是"捕获异常"，是"断言必须抛异常，否则测试失败"
+
+---
+

@@ -25,3 +25,22 @@ class FailingMockProvider:
         if self.call_count <= 2:
             raise LLMAuthError("认证错误")  # ← 手动抛
         return ChatResponse(content="成功了", input_tokens=len(request.messages), output_tokens=10)
+
+
+class MockProvider2:
+    def __init__(self, responses: list[str]):
+        # 把 responses 存起来
+        self.responses = responses
+
+    def chat(self, request: ChatRequest) -> ChatResponse:
+        if not self.responses:
+            raise ValueError("MockProvider 的预设回答已用完")
+        # 从存好的列表里取下一个
+        # 取出的是字符串，要包装成 ChatResponse 返回
+        return ChatResponse(
+            content=self.responses.pop(0),
+            input_tokens=len(request.messages),
+            output_tokens=10,
+        )
+
+

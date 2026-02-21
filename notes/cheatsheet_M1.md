@@ -600,3 +600,70 @@ content = parse_json(response.content) or response.content
 
 ---
 
+## M2-W5-D4【速查表-本节知识】
+
+### MockProvider 核心价值
+
+- 省钱：不消耗真实 API 额度
+- 够快：瞬间返回，50个测试 <1秒
+- 确定：返回值可控，assert 才稳定
+
+### MockProvider 最小实现
+
+```python
+class MockProvider:
+    def __init__(self, responses: list[str]):
+        self.responses = responses
+
+    def chat(self, request: ChatRequest) -> ChatResponse:
+        if not self.responses:
+            raise ValueError("MockProvider 的预设回答已用完")
+        return ChatResponse(
+            content=self.responses.pop(0),
+            input_tokens=len(request.messages),
+            output_tokens=10,
+        )
+```
+
+### pytest 三段式
+
+```python
+def test_xxx():
+    # 1. 准备
+    # 2. 执行
+    # 3. 断言
+    assert result == expected
+```
+
+### 验证异常
+
+```python
+import pytest
+
+with pytest.raises(ValueError):
+    触发异常的代码()
+# 没抛异常 → 测试 FAIL
+```
+
+### pytest.raises vs try/except
+
+- `try/except`：业务代码，"出错了我来兜底"
+- `pytest.raises`：测试代码，"必须抛，没抛就测试失败"
+
+### src 布局配置 pytest
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+```
+
+### 运行测试
+
+```bash
+pytest tests/ -v          # 跑所有测试
+pytest tests/test_x.py -v # 跑单个文件
+```
+
+---
+

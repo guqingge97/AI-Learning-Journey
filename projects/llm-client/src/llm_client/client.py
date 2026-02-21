@@ -7,7 +7,7 @@
 from .provider import LLMProvider
 from .models import ChatRequest, ChatResponse
 from .retry import RetryHandler
-from structured_output import parse_json
+from llm_client.structured_output import parse_json
 
 class LLMClient:
     def __init__(self, provider: LLMProvider, retry_handler: RetryHandler):
