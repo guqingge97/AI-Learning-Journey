@@ -667,3 +667,39 @@ pytest tests/test_x.py -v # 跑单个文件
 
 ---
 
+## M2-W5-D5【速查表-本节知识】
+
+**成本计算公式** 成本 = 总token数 × (单价 / 1000)
+
+**gpt-4o-mini 参考单价**
+
+- 输入：$0.00015 / 1K tokens
+- 输出：$0.00060 / 1K tokens
+
+**从 ChatResponse 取成本**
+
+
+
+python
+
+```python
+cost = response.input_tokens * 0.00015/1000 \
+     + response.output_tokens * 0.00060/1000
+```
+
+**LLMClient 五大限制**
+
+1. 不支持流式输出
+2. 不支持多轮对话（无上下文维护）
+3. 重试次数写死，不可动态调整
+4. 结构化输出不保证100%成功
+5. MockClient 仅限测试
+
+**最佳实践三条**
+
+- 批量处理 → try/except + 失败记录重跑
+- prompt 过长 → 只带关键信息/摘要
+- 测试阶段 → 用 MockClient，不消耗真实费用
+
+---
+
